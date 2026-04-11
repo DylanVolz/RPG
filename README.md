@@ -4,34 +4,120 @@
 > Feedback, suggestions, and contributions are welcome — feel free to open an issue or start a discussion!
 
 A collection of browser-based tools for working with **[Quaternius](https://quaternius.com)** 3D assets in Three.js.
-No build step, no server required — open directly in Chrome or Firefox.
+No build step, no bundler — runs entirely in the browser.
 
 > **3D assets (Quaternius) are not included** — see the Setup section below.
 
 ---
 
-## Tools
+## Quick Start
 
-| File | Description |
-|------|-------------|
-| `char-builder.html` | Character editor — modular outfits, per-zone shaders |
-| `char-combined.html` | Combined char builder + preview |
-| `character-preview.html` | Character preview |
-| `anim-inspect.html` | Animation clip inspector |
-| `asset-browser.html` | Asset browser |
-| `village-browser.html` | Medieval village asset browser |
-| `nature-browser.html` | Nature asset browser |
-| `soldier-test.html` | Soldier / character test |
+**1. Clone the repository**
+```bash
+git clone https://github.com/ixtrem16-netizen/RPG.git
+cd RPG
+```
+
+**2. Download the Quaternius assets** — see [Required Assets](#setup--required-assets) below.
+
+**3. Start a local server**
+```bash
+npx serve . -p 3000
+```
+Then open **http://localhost:3000** in Chrome or Firefox.
+
+> Any static file server works. Alternatively:
+> ```bash
+> python -m http.server 3000
+> ```
 
 ---
 
-## Source files
+## Tools
 
-| File | Description |
-|------|-------------|
-| `src/character.js` | CharacterController — loadRetargeted, AnimationMixer, state machine |
-| `src/char-config.js` | Character config hub — outfit, hair, body per character name |
-| `src/shaders.js` | Post-processing shaders (color grade) |
+### `char-builder.html` — Character Builder
+Assemble modular characters from Quaternius outfit parts with per-zone color shaders.
+
+- **Right-click + drag** — orbit camera
+- **Scroll wheel** — zoom
+- Left panel: switch body, outfit, texture, hair, beard
+- Save / load character configs by name
+- Export config for use in your own project
+
+---
+
+### `char-combined.html` — Combined Builder + Preview
+Character builder and full-body preview side by side.
+
+---
+
+### `character-preview.html` — Character Preview
+Preview a fully assembled character with animations playing.
+
+- **Right-click + drag** — orbit camera
+- **Scroll wheel** — zoom
+
+---
+
+### `anim-inspect.html` — Animation Inspector
+Browse and preview all animation clips from UAL1 / UAL2.
+
+- Click **UAL 1** or **UAL 2** to switch library
+- Click any clip name to preview it on the character
+- Duration is shown under each clip name
+
+---
+
+### `asset-browser.html` — Asset Browser
+Browse all loaded Quaternius assets (characters, props, environment).
+
+- **Left panel** — filter by category / search by name
+- **Right panel** — 3D preview with orbit controls
+- **Right-click + drag** — orbit · **Scroll** — zoom
+
+---
+
+### `village-browser.html` — Village Browser
+Browse and preview all Medieval Village MegaKit pieces.
+
+- **Right-click + drag** — orbit · **Scroll** — zoom
+
+---
+
+### `nature-browser.html` — Nature Browser
+Browse and preview nature assets (trees, rocks, vegetation).
+
+- **Right-click + drag** — orbit · **Scroll** — zoom
+
+---
+
+### `soldier-test.html` — Soldier Test
+Quick character + animation test scene.
+
+- **Right-click + drag** — orbit · **Scroll** — zoom
+
+---
+
+### `gameplay-test.html` — Gameplay Prototype
+Full gameplay prototype — locomotion, combat, physics, town.
+
+| Key | Action |
+|-----|--------|
+| W / A / S / D | Move |
+| Shift | Sprint |
+| Space | Jump |
+| C | Crouch / Slide (while sprinting) |
+| R | Roll |
+| Shift + Q / E | Dodge left / right |
+| F | Interact / Climb |
+| K | Kick |
+| 1–4 | Combat mode (Sword / Fists / Magic / Bow) |
+| 0 | Unequip |
+| G | Emote wheel |
+| Tab | Camera lock-on |
+| V | Camera mode (3rd person / shoulder) |
+| I | Inventory |
+| Escape | Pause |
 
 ---
 
@@ -70,7 +156,7 @@ assets/
 │   │
 │   ├── bodies/
 │   │   ├── Superhero_Male_FullBody.gltf    ← Modular Character Outfits - Fantasy
-│   │   └── Superhero_Female_FullBody.gltf  ←   (rigged bodies — modular pack)
+│   │   └── Superhero_Female_FullBody.gltf
 │   │
 │   ├── outfits/
 │   │   └── *.gltf / *.bin          ← Modular Character Outfits - Fantasy
@@ -94,28 +180,27 @@ assets/
 
 ---
 
-### Installation
+## Source files
 
-**1. Clone the repository**
-```bash
-git clone https://github.com/ixtrem16-netizen/RPG.git
-cd RPG
-```
-
-**2. Download the Quaternius packs**
-
-- Go to **quaternius.com** or the **Quaternius Patreon**
-- Download the packs listed above and place the files in the directories above.
-
-**3. Open in browser**
-
-Open any `.html` file directly in Chrome or Firefox.
-
-> **Chrome note**: if assets don't load locally (`file://`), run a minimal HTTP server:
-> ```bash
-> python -m http.server 8080
-> # then open http://localhost:8080
-> ```
+| File | Description |
+|------|-------------|
+| `src/character.js` | CharacterController — loadRetargeted, AnimationMixer, state machine |
+| `src/char-config.js` | Character config hub — outfit, hair, body per character name |
+| `src/shaders.js` | Post-processing shaders (color grade) |
+| `src/camera.js` | Witcher-style orbit camera — lean, lock-on, 1st/3rd person |
+| `src/player.js` | Player movement, physics, stats |
+| `src/collision.js` | AABB collision — floors, walls, ramps |
+| `src/world.js` | Procedural terrain, chunks, biomes |
+| `src/builder.js` | Procedural building blocks (room, torch, light) |
+| `src/npc.js` | NPC class — outfit loading, wander AI, terrain tilt |
+| `src/town.js` | Town assembly (Valcrest) |
+| `src/daynight.js` | Day/night cycle, sky dome, sun/moon |
+| `src/audio.js` | Footsteps, ambient sounds per zone |
+| `src/ui.js` | HUD — hp, stamina, clock |
+| `src/inventory.js` | Inventory system |
+| `src/gods.js` | Narrative deity system |
+| `src/build_mode.js` | In-game build mode (WIP) |
+| `src/buildings/` | Prefab buildings (small house, tower, town hall) |
 
 ---
 
