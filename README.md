@@ -1,5 +1,8 @@
 # Three.js Quaternius Studio
 
+> **Work in progress** — things may be incomplete, change without notice, or break unexpectedly.
+> Feedback, suggestions, and contributions are welcome — feel free to open an issue or start a discussion!
+
 A collection of browser-based tools for working with **[Quaternius](https://quaternius.com)** 3D assets in Three.js.
 No build step, no server required — open directly in Chrome or Firefox.
 
