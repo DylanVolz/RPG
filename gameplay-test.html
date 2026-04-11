@@ -64,16 +64,58 @@ canvas { display:block; width:100vw; height:100vh; }
 }
 #combat-mode { color:#d4a84b; font-size:11px; letter-spacing:2px; }
 
-/* ── Kick button ── */
-#kick-btn {
-    position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
-    font-size:9px; letter-spacing:3px; text-transform:uppercase;
-    background:rgba(0,0,0,0.65); border:1px solid rgba(200,184,154,0.2);
-    color:rgba(200,184,154,0.55); padding:5px 14px; cursor:pointer;
-    pointer-events:all; transition:all 0.12s; user-select:none;
+/* ── Kick button (masqué — intégré à la belt) ── */
+#kick-btn { display:none; }
+
+/* ── Belt (ceinture rapide armes) ── */
+#belt {
+    position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:flex-end; gap:3px; pointer-events:all;
 }
-#kick-btn:hover { background:rgba(200,184,154,0.1); color:#d4a84b; border-color:rgba(212,168,75,0.4); }
-#kick-btn.cooldown { opacity:0.3; cursor:default; }
+.belt-slot {
+    width:56px; height:64px;
+    background:rgba(6,4,2,0.9);
+    border:1px solid rgba(100,74,30,0.5);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,0.8);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative;
+    transition:border-color 0.12s, box-shadow 0.12s;
+    user-select:none;
+}
+.belt-slot:hover {
+    border-color:rgba(200,160,50,0.55);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,0.6), 0 0 8px rgba(200,160,50,0.18);
+}
+.belt-slot.active-r {
+    border-color:#c8a050;
+    box-shadow:inset 0 0 10px rgba(200,160,50,0.1), 0 0 14px rgba(200,160,50,0.35);
+}
+.belt-slot.active-l {
+    border-color:#5090c8;
+    box-shadow:inset 0 0 10px rgba(80,144,200,0.1), 0 0 14px rgba(80,144,200,0.35);
+}
+.belt-slot.belt-kick {
+    border-color:rgba(180,60,40,0.4);
+    height:56px;
+}
+.belt-slot.belt-kick:hover  { border-color:rgba(220,80,50,0.7); }
+.belt-slot.belt-kick.cooldown { opacity:0.3; cursor:default; }
+.belt-slot canvas { display:block; flex-shrink:0; }
+.belt-lbl {
+    font-size:6.5px; letter-spacing:0.8px; text-transform:uppercase;
+    color:rgba(200,184,154,0.32); margin-top:3px; text-align:center;
+    line-height:1.2; max-width:52px; overflow:hidden; white-space:nowrap;
+}
+.belt-slot.active-r .belt-lbl { color:rgba(200,160,50,0.7); }
+.belt-slot.active-l .belt-lbl { color:rgba(80,144,200,0.7); }
+.belt-hand {
+    position:absolute; top:2px; right:3px;
+    font-size:6px; letter-spacing:0.5px; color:rgba(200,184,154,0.25);
+}
+.belt-divider {
+    width:1px; height:44px; align-self:center;
+    background:rgba(200,184,154,0.1); margin:0 2px;
+}
 
 /* ── Emote wheel ── */
 #emote-wheel {
@@ -132,11 +174,12 @@ canvas { display:block; width:100vw; height:100vh; }
     display:none; text-align:center;
 }
 
-/* ── Weapon panel ── */
+/* ── Weapon panel (grip editor uniquement — masqué par défaut) ── */
 #weapon-panel {
-    position:absolute; bottom:60px; left:12px;
-    background:rgba(0,0,0,0.72); border:1px solid rgba(200,184,154,0.15);
+    position:absolute; bottom:80px; left:12px;
+    background:rgba(0,0,0,0.82); border:1px solid rgba(200,184,154,0.15);
     padding:8px 10px; width:210px; pointer-events:all;
+    display:none;
 }
 #weapon-panel .wp-title {
     font-size:8px; letter-spacing:3px; text-transform:uppercase;
@@ -251,7 +294,10 @@ canvas { display:block; width:100vw; height:100vh; }
   <div id="crosshair"></div>
   <div id="climb-prompt">F / Espace — Grimper &nbsp;|&nbsp; (saut vers le mur = auto-grab)</div>
   <div id="notif"></div>
-  <button id="kick-btn" onclick="doKick()">🦵 Coup de pied &nbsp;<span style="opacity:0.4;font-size:8px">[K]</span></button>
+  <button id="kick-btn" onclick="doKick()"></button>
+
+  <!-- Belt — peuplée dynamiquement par _buildBelt() -->
+  <div id="belt"></div>
 
   <div id="weapon-panel">
     <div class="wp-title">Armes</div>
@@ -297,6 +343,7 @@ import * as THREE from 'three';
 import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { showCharCreation } from './src/char-creation.js';
+import { InventorySystem }  from './src/inventory.js';
 
 // ═══════════════════════════════════════════════════════════════
 //  CONFIG — Chemins
@@ -833,7 +880,10 @@ const STATE = {
     launchY:    0,   // Y au décollage — hauteur de chute calculée à l'atterrissage
 
     // ── One-shot lock ──────────────────────────────────────────────
-    oneShotLock: false,
+    oneShotLock:   false,
+    attackLock:    false,   // vrai pendant les animations d'attaque/kick
+    attackLungeX:  0,       // impulsion lunge en cours (m/s, décroit exponentiellement)
+    attackLungeZ:  0,
 
     // ── Roll / Dodge movement ──────────────────────────────────────
     rolling:   false,
@@ -844,7 +894,10 @@ const STATE = {
     dodgeTime: 0,      // timer de décélération dodge
 
     // ── Stamina ────────────────────────────────────────────────────
+    hp:         100,
+    maxHp:      100,
     stamina:    100,
+    maxStamina: 100,
 
     // ── Combat ─────────────────────────────────────────────────────
     combatMode:     0,
@@ -971,7 +1024,7 @@ let mouseL = false, mouseR = false, mouseRJust = false, mouseLJust = false;
 const GAME_KEYS = new Set([
     'KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
     'Space','ShiftLeft','ShiftRight','ControlLeft','ControlRight',
-    'KeyC','KeyE','KeyF','KeyG','KeyK','KeyQ','KeyR','KeyV',
+    'KeyC','KeyE','KeyF','KeyG','KeyI','KeyK','KeyQ','KeyR','KeyV',
     'CapsLock',
     'Digit0','Digit1','Digit2','Digit3','Digit4','Tab',
 ]);
@@ -979,6 +1032,16 @@ window.addEventListener('keydown', e => {
     if (!keys.has(e.code)) justDown.add(e.code);
     keys.add(e.code);
     if (GAME_KEYS.has(e.code)) e.preventDefault();
+    // Inventaire — toggle sur I
+    if (e.code === 'KeyI' && inventory) {
+        if (inventory.isOpen) {
+            inventory.close();
+            canvas.requestPointerLock?.();
+        } else {
+            inventory.open();
+            document.exitPointerLock?.();
+        }
+    }
 });
 window.addEventListener('keyup', e => {
     justUp.add(e.code);
@@ -1202,6 +1265,7 @@ function applyIsolatedScales(root, overrides, restPos) {
 // ═══════════════════════════════════════════════════════════════
 let charRoot   = null;
 let mixer      = null;
+let inventory  = null;
 const actions  = {};       // nom clip → AnimationAction
 let activeAct  = null;
 let activeClip = '';
@@ -1411,6 +1475,7 @@ async function loadCharacter(cfg) {
 
     buildGeoList();
     _buildWeaponPanel();
+    _buildBelt();
     setLoadProgress(100);
     playAnim('idle', 0.1);
     return root;
@@ -1560,6 +1625,7 @@ function _gripFor(key) {
 
 function _showGripEditor(slot, key, mesh) {
     gripEditSlot = slot;
+    document.getElementById('weapon-panel').style.display = 'block';
     const grip = document.getElementById('wp-grip');
     grip.style.display = 'block';
 
@@ -1620,6 +1686,7 @@ function _showGripEditor(slot, key, mesh) {
 
 function _hideGripEditor() {
     document.getElementById('wp-grip').style.display = 'none';
+    document.getElementById('weapon-panel').style.display = 'none';
     gripEditSlot = null;
 }
 
@@ -1635,6 +1702,145 @@ function logGripOffsets() {
     showNotif('✓ Grip sauvegardé — ' + key);
 }
 
+// ─── Icônes belt ────────────────────────────────────────────
+function _drawBeltIcon(canvas, key) {
+    const c = canvas.getContext('2d');
+    const W = canvas.width;
+    c.clearRect(0, 0, W, W);
+    const col  = key === 'shield' ? '#5090c8' : '#c8a050';
+    const fill = col + '38';
+    c.strokeStyle = col; c.fillStyle = fill;
+    c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round';
+
+    if (!key || key === 'none') {
+        c.strokeStyle = 'rgba(120,90,40,0.35)'; c.lineWidth = 1.5;
+        c.beginPath(); c.moveTo(W*.28,W*.28); c.lineTo(W*.72,W*.72);
+        c.moveTo(W*.72,W*.28); c.lineTo(W*.28,W*.72); c.stroke();
+        return;
+    }
+    switch (key) {
+        case 'sword':
+            c.beginPath(); c.moveTo(W/2,7); c.lineTo(W/2,W-9); c.stroke();
+            c.beginPath(); c.moveTo(11,21); c.lineTo(W-11,21); c.stroke();
+            c.beginPath(); c.arc(W/2,7,2.5,0,Math.PI*2); c.fill();
+            break;
+        case 'axe':
+            c.beginPath(); c.moveTo(W-11,10); c.lineTo(11,W-9); c.stroke();
+            c.beginPath(); c.moveTo(W-11,10);
+            c.bezierCurveTo(W-2,7,W-1,21,W-13,22);
+            c.lineTo(W-22,13); c.closePath(); c.fill(); c.stroke();
+            break;
+        case 'knife':
+            c.beginPath(); c.moveTo(W/2+2,8); c.lineTo(W/2-1,W-10); c.stroke();
+            c.beginPath();
+            c.moveTo(W/2-1,11); c.lineTo(W/2+10,19); c.lineTo(W/2-1,W-10);
+            c.closePath(); c.fill();
+            break;
+        case 'pickaxe':
+            c.beginPath(); c.moveTo(9,W-9); c.lineTo(W-9,17); c.stroke();
+            c.beginPath();
+            c.moveTo(W-9,17); c.bezierCurveTo(W-1,15,W-1,25,W-11,25);
+            c.moveTo(W-9,17); c.bezierCurveTo(W-3,9,W-19,7,W-23,11);
+            c.stroke();
+            c.beginPath(); c.arc(W-9,17,3,0,Math.PI*2); c.fill();
+            break;
+        case 'torch':
+            c.beginPath(); c.moveTo(W/2,W-7); c.lineTo(W/2,25);
+            c.lineWidth = 3.5; c.stroke(); c.lineWidth = 1.8;
+            c.fillStyle = '#e05010';
+            c.beginPath();
+            c.moveTo(W/2,25); c.bezierCurveTo(15,19,13,7,W/2,5);
+            c.bezierCurveTo(W-13,7,W-15,19,W/2,25); c.fill();
+            c.fillStyle = '#e8b84088';
+            c.beginPath();
+            c.moveTo(W/2,23); c.bezierCurveTo(18,18,17,10,W/2,8);
+            c.bezierCurveTo(W-17,10,W-18,18,W/2,23); c.fill();
+            break;
+        case 'shield':
+            c.beginPath();
+            c.moveTo(W/2,8); c.lineTo(W-10,18); c.lineTo(W-10,32);
+            c.lineTo(W/2,W-7); c.lineTo(10,32); c.lineTo(10,18);
+            c.closePath(); c.fill(); c.stroke();
+            c.strokeStyle = col + 'aa';
+            c.beginPath();
+            c.moveTo(W/2,14); c.lineTo(W/2,W-11);
+            c.moveTo(15,24); c.lineTo(W-15,24); c.stroke();
+            break;
+        case 'kick':
+            c.strokeStyle = '#c84030'; c.fillStyle = '#c8403038';
+            c.beginPath();
+            c.moveTo(12,24); c.lineTo(28,14); c.lineTo(38,22);
+            c.lineTo(44,36); c.stroke();
+            c.beginPath(); c.arc(38,22,5,0,Math.PI*2); c.fill(); c.stroke();
+            break;
+    }
+}
+
+// ─── Construction de la belt ─────────────────────────────────
+function _buildBelt() {
+    const belt = document.getElementById('belt');
+    belt.innerHTML = '';
+
+    // Slots main droite
+    const rightSlots = [
+        { key:'none',     label:'Aucune', hand:'R' },
+        { key:'sword',    label:'Épée',   hand:'R' },
+        { key:'axe',      label:'Hache',  hand:'R' },
+        { key:'knife',    label:'Couteau',hand:'R' },
+        { key:'pickaxe',  label:'Pioche', hand:'R' },
+        { key:'torch',    label:'Torche', hand:'R' },
+    ];
+    rightSlots.forEach(s => belt.appendChild(_makeBeltSlot(s.key, s.label, s.hand)));
+
+    // Séparateur
+    const div = document.createElement('div');
+    div.className = 'belt-divider';
+    belt.appendChild(div);
+
+    // Shield (main gauche)
+    belt.appendChild(_makeBeltSlot('shield', 'Bouclier', 'L'));
+
+    // Séparateur
+    const div2 = document.createElement('div');
+    div2.className = 'belt-divider';
+    belt.appendChild(div2);
+
+    // Kick
+    belt.appendChild(_makeBeltSlot('kick', 'Kick [K]', 'kick'));
+
+    _refreshWeaponUI();
+}
+
+function _makeBeltSlot(key, label, hand) {
+    const slot = document.createElement('div');
+    slot.className = 'belt-slot' + (hand === 'kick' ? ' belt-kick' : '');
+    slot.dataset.beltKey  = key;
+    slot.dataset.beltHand = hand;
+
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 40;
+    _drawBeltIcon(cv, key);
+    slot.appendChild(cv);
+
+    const lbl = document.createElement('span');
+    lbl.className = 'belt-lbl';
+    lbl.textContent = label;
+    slot.appendChild(lbl);
+
+    if (hand === 'R' || hand === 'L') {
+        const h = document.createElement('span');
+        h.className = 'belt-hand';
+        h.textContent = hand;
+        slot.appendChild(h);
+    }
+
+    slot.addEventListener('click', () => {
+        if (hand === 'kick') { doKick(); return; }
+        equipWeapon(hand, key);
+    });
+    return slot;
+}
+
 function _refreshWeaponUI() {
     document.querySelectorAll('.wp-btn').forEach(btn => {
         btn.classList.toggle('active',
@@ -1642,6 +1848,19 @@ function _refreshWeaponUI() {
             (btn.dataset.slot === 'L' && btn.dataset.key === activeKeyL)
         );
     });
+    // Belt
+    document.querySelectorAll('.belt-slot').forEach(slot => {
+        const k = slot.dataset.beltKey;
+        const h = slot.dataset.beltHand;
+        slot.classList.toggle('active-r', h === 'R' && k === activeKeyR);
+        slot.classList.toggle('active-l', h === 'L' && k === activeKeyL);
+    });
+    // Kick cooldown visuel géré séparément
+}
+
+// Sync cooldown du kick sur le slot belt
+function _setBeltKickCooldown(on) {
+    document.querySelector('.belt-kick')?.classList.toggle('cooldown', on);
 }
 
 function _buildWeaponPanel() {
@@ -1723,13 +1942,17 @@ const LOOP_ANIMS = new Set([
 ]);
 
 let oneShotCallback = null;
+let attackBuffer    = false; // clic mémorisé pendant une attaque → déclenché dès le prochain frame disponible
 
 function playAnim(name, crossfade=0.15, onEnd=null) {
     const act = actions[name];
     if (!act) {
-        // Animation introuvable — débloquer oneShotLock immédiatement (évite lock permanent)
+        // Animation introuvable — débloquer les locks immédiatement (évite lock permanent)
         if (onEnd) {
-            STATE.oneShotLock = false;
+            STATE.oneShotLock  = false;
+            STATE.attackLock   = false;
+            STATE.attackLungeX = 0;
+            STATE.attackLungeZ = 0;
             oneShotCallback = null;
             onEnd();
         } else if (name !== 'idle') {
@@ -1743,12 +1966,15 @@ function playAnim(name, crossfade=0.15, onEnd=null) {
     }
 
     // Nettoyer l'ancien callback stale avant de démarrer la nouvelle anim.
-    // Si une anim one-shot est interrompue, son oneShotLock doit être libéré
+    // Si une anim one-shot est interrompue, ses locks doivent être libérés
     // — sinon le personnage reste gelé indéfiniment.
     if (oneShotCallback) {
         mixer.removeEventListener('finished', oneShotCallback);
         oneShotCallback = null;
-        STATE.oneShotLock = false;
+        STATE.oneShotLock  = false;
+        STATE.attackLock   = false;
+        STATE.attackLungeX = 0;
+        STATE.attackLungeZ = 0;
     }
     if (activeAct) activeAct.fadeOut(crossfade);
 
@@ -1981,16 +2207,16 @@ function _cancelSprintEnter() {
 
 function _exitSprint(moving) {
     STATE.sprintState = 'exit';
-    if (moving && actions['sprint_exit']) {
-        playAnim('sprint_exit', 0.15, () => {
-            STATE.sprintState = 'off';
-            STATE.oneShotLock = false;
-        });
-        STATE.oneShotLock = true;
-    } else {
+    // Si une animation non-interruptible tourne (attaque, roulade...), ne pas jouer sprint_exit
+    if (STATE.oneShotLock || !moving || !actions['sprint_exit']) {
         STATE.sprintState = 'off';
-        // resolveAnim prend le relais (idle ou jog)
+        return;
     }
+    playAnim('sprint_exit', 0.15, () => {
+        STATE.sprintState = 'off';
+        STATE.oneShotLock = false;
+    });
+    STATE.oneShotLock = true;
 }
 
 function update(delta) {
@@ -2098,11 +2324,25 @@ function _updateInner(delta) {
             activeClip === 'dodge_left'   || activeClip === 'dodge_right'
         );
         if (isMoving && STATE.traversal !== 'slide' && !landingLocked) {
-            const spd = getMoveSpeed(isSprinting);
+            // En attaque : vitesse réduite (footwork) sans changer d'orientation
+            const atkMult = STATE.attackLock ? 0.25 : 1.0;
+            const spd = getMoveSpeed(isSprinting) * atkMult;
             STATE.pos.x += _moveDir.x * spd * delta;
             STATE.pos.z += _moveDir.z * spd * delta;
-            STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
-            if (isSprinting) STATE.stamina = Math.max(0, STATE.stamina - 15 * delta);
+            if (!STATE.attackLock) {
+                STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
+                if (isSprinting) STATE.stamina = Math.max(0, STATE.stamina - 15 * delta);
+            }
+        }
+        // Lunge d'attaque — impulsion avant sur les premiers frames
+        if (STATE.attackLungeX !== 0 || STATE.attackLungeZ !== 0) {
+            STATE.pos.x += STATE.attackLungeX * delta;
+            STATE.pos.z += STATE.attackLungeZ * delta;
+            const decay = Math.exp(-9 * delta);
+            STATE.attackLungeX *= decay;
+            STATE.attackLungeZ *= decay;
+            if (Math.abs(STATE.attackLungeX) < 0.02) STATE.attackLungeX = 0;
+            if (Math.abs(STATE.attackLungeZ) < 0.02) STATE.attackLungeZ = 0;
         }
         STATE.airVelX = isMoving ? _moveDir.x * (isSprinting ? SPRINT_SPD : JOG_SPD) : 0;
         STATE.airVelZ = isMoving ? _moveDir.z * (isSprinting ? SPRINT_SPD : JOG_SPD) : 0;
@@ -2240,7 +2480,7 @@ function _updateInner(delta) {
     }
 
     // ── ACTIONS : Saut / Vault / Grimpe ───────────────────────
-    if (spaceJust && STATE.grounded) {
+    if (spaceJust && STATE.grounded && !STATE.oneShotLock) {
         if (STATE.posture === 'stand') {
             if (nearVault)      doVault(wallHit);
             else if (nearClimb) enterClimb(wallHit);
@@ -2796,7 +3036,8 @@ function enterCombatStance() {
 function exitCombatStance() {
     if (!STATE.inCombatStance) return;
     STATE.inCombatStance = false;
-    toolLoopActive = false;
+    toolLoopActive  = false;
+    attackBuffer    = false;
     const exitAnim = STATE.combatMode === 1 ? 'sword_exit'
         : STATE.combatMode === 3 ? 'spell_exit'
         : null;
@@ -2833,34 +3074,40 @@ function doKick() {
         _refreshWeaponUI();
     }
     kickCooldown = 0.9;
-    const kickBtn = document.getElementById('kick-btn');
-    if (kickBtn) kickBtn.classList.add('cooldown');
+    _setBeltKickCooldown(true);
     STATE.oneShotLock = true;
+    STATE.attackLock  = true;
+    if (STATE.grounded) {
+        STATE.attackLungeX = -Math.sin(STATE.yaw) * 2.5;
+        STATE.attackLungeZ = -Math.cos(STATE.yaw) * 2.5;
+    }
     playAnim('kick', 0.12, () => {
+        STATE.attackLock  = false;
         STATE.oneShotLock = false;
         playAnim(getCombatIdleAnim(), 0.2);
-        if (kickBtn) kickBtn.classList.remove('cooldown');
+        _setBeltKickCooldown(false);
     });
 }
 
 function updateCombat(delta, atkJust, blockJust) {
     attackCooldown -= delta;
     comboTimer     -= delta;
-    if (comboTimer < 0) comboStep = 0;
+    if (comboTimer < 0) {
+        comboStep    = 0;
+        attackBuffer = false; // reset buffer avec le combo
+    }
 
     // Blocage / viser
     if (blockJust && !STATE.oneShotLock) {
         if (STATE.combatMode === 1 || STATE.hasShield ||
             STATE.combatMode === 5 || STATE.combatMode === 6) {
-            // Épée, bouclier, hache, couteau → parade
             playAnim('sword_block', 0.1);
             STATE.blocking = true;
         } else if (STATE.combatMode === 3) {
             playAnim('spell2_idle', 0.15);
         } else if (STATE.combatMode === 4) {
-            // Arc : clic droit = cycle aim up → neutral → down
-            const aim = activeClip === 'bow_idle'    ? 'bow_aim_u'
-                      : activeClip === 'bow_aim_u'   ? 'bow_aim_d'
+            const aim = activeClip === 'bow_idle'  ? 'bow_aim_u'
+                      : activeClip === 'bow_aim_u' ? 'bow_aim_d'
                       : 'bow_idle';
             playAnim(aim, 0.12);
         }
@@ -2883,8 +3130,14 @@ function updateCombat(delta, atkJust, blockJust) {
     // Mode torche — aucun combat
     if (STATE.combatMode === 8) return;
 
-    // Attaque
-    if (!atkJust || attackCooldown > 0 || STATE.oneShotLock) return;
+    // ── Input buffer ───────────────────────────────────────────────
+    // Mémoriser un clic pendant l'animation d'attaque
+    if (atkJust && STATE.oneShotLock) attackBuffer = true;
+
+    // Déclencher si clic direct OU buffer disponible, lock libéré, cooldown expiré
+    const fireAtk = (atkJust || attackBuffer) && !STATE.oneShotLock && attackCooldown <= 0;
+    if (!fireAtk) return;
+    attackBuffer = false; // consommé
 
     let atkAnim, returnTo, cd;
     switch (STATE.combatMode) {
@@ -2905,14 +3158,14 @@ function updateCombat(delta, atkJust, blockJust) {
             atkAnim = activeClip === 'spell2_idle' ? 'spell2_shoot' : 'spell_shoot';
             returnTo = getCombatIdleAnim(); cd = 0.7;
             break;
-        case 4: // Arc — tire depuis la position visée actuelle
+        case 4: // Arc
             atkAnim = 'bow_shoot';
             returnTo = activeClip === 'bow_aim_u' ? 'bow_aim_u'
                      : activeClip === 'bow_aim_d' ? 'bow_aim_d'
                      : 'bow_idle';
             cd = 0.9;
             break;
-        case 6: // Couteau — stabs rapides : jab → knee → hook rotation
+        case 6: // Couteau — stabs rapides
             comboTimer = 0.8;
             if (comboStep % 3 === 0)      atkAnim = 'punch_jab';
             else if (comboStep % 3 === 1) atkAnim = 'melee_knee';
@@ -2923,9 +3176,29 @@ function updateCombat(delta, atkJust, blockJust) {
     }
 
     attackCooldown = cd;
+    STATE.attackLock = true;
+
+    // Lunge — impulsion avant selon le mode
+    {
+        const lungeStr = STATE.combatMode === 1 ? 3.5
+                       : STATE.combatMode === 2 ? 2.2
+                       : STATE.combatMode === 5 ? 2.8
+                       : STATE.combatMode === 6 ? 2.0
+                       : 0;
+        if (lungeStr > 0 && STATE.grounded) {
+            STATE.attackLungeX = -Math.sin(STATE.yaw) * lungeStr;
+            STATE.attackLungeZ = -Math.cos(STATE.yaw) * lungeStr;
+        }
+    }
+
+    // Capturer returnTo dans la closure pour le callback
+    const _returnTo = returnTo;
     playAnim(atkAnim, 0.06, () => {
+        STATE.attackLock  = false;
         STATE.oneShotLock = false;
-        playAnim(returnTo, 0.2);
+        // Si un clic a été bufferisé pendant cette attaque, ne pas revenir à idle —
+        // updateCombat va enchaîner directement au prochain frame
+        if (!attackBuffer) playAnim(_returnTo, 0.2);
     });
     STATE.oneShotLock = true;
 }
@@ -3067,10 +3340,11 @@ function animate() {
     requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.05);
 
-    if (charRoot) {
+    if (charRoot && !inventory?.isOpen) {
         update(delta);
         updateCharMesh(delta);
     }
+    inventory?.tick(delta);
     updateCamera(delta);
     updateHUD(delta);
     renderer.render(scene, camera);
@@ -3094,9 +3368,29 @@ buildEmoteWheel();
         await loadCharacter(cfg);
         setLoadProgress(100);
         setLoadSub('Prêt !');
+
+        // ── Inventaire ───────────────────────────────────────────
+        // Correspondance model Quaternius → clé WEAPON_DEFS
+        const MODEL_TO_WEAPON = {
+            Sword_Bronze:   'sword',
+            Axe_Bronze:     'axe',
+            Table_Knife:    'knife',
+            Torch_Metal:    'torch',
+            Pickaxe_Bronze: 'pickaxe',
+            Shield_Wooden:  'shield',
+        };
+        inventory = new InventorySystem(STATE, {
+            onEquip: (item) => {
+                const key = MODEL_TO_WEAPON[item.effect?.weapon] || null;
+                if (!key) return;
+                const slot = key === 'shield' ? 'L' : 'R';
+                equipWeapon(slot, key);
+            },
+        });
+
         await new Promise(r => setTimeout(r, 600));
         document.getElementById('loading').style.display = 'none';
-        showNotif('Bienvenue, ' + cfg.name + ' — G pour les émotes');
+        showNotif('Bienvenue, ' + cfg.name + ' — I pour l\'inventaire · G pour les émotes');
     } catch(e) {
         console.error(e);
         setLoadSub('Erreur chargement : ' + e.message);

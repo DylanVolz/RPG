@@ -1,6 +1,82 @@
 import * as THREE from 'three';
 
 // ─────────────────────────────────────────────────────────
+//  CSS — injecté automatiquement (module standalone)
+// ─────────────────────────────────────────────────────────
+function _injectCSS() {
+    if (document.getElementById('inv-style')) return;
+    const s = document.createElement('style');
+    s.id = 'inv-style';
+    s.textContent = `
+#inventory{position:fixed;inset:0;background:rgba(0,0,0,0.87);display:flex;align-items:center;justify-content:center;z-index:90;opacity:0;pointer-events:none;transition:opacity 0.2s ease;font-family:'Georgia',serif;}
+#inventory.visible{opacity:1;pointer-events:all;}
+.inv-panel{background:#0d0a06;border:2px solid #7a5c2a;box-shadow:0 0 0 1px #1a1208,0 0 0 4px #0a0806,0 0 80px rgba(0,0,0,0.97),inset 0 0 120px rgba(0,0,0,0.6);width:980px;max-height:95vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a2818 transparent;position:relative;display:flex;flex-direction:column;}
+.inv-panel::after{content:'';position:absolute;inset:5px;border:1px solid rgba(180,140,60,0.12);pointer-events:none;z-index:999;}
+.inv-header{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;background:linear-gradient(90deg,#0d0a06 0%,#181006 40%,#181006 60%,#0d0a06 100%);border-bottom:1px solid #7a5c2a;}
+.inv-title{font-size:0.8rem;letter-spacing:0.7em;color:#c8a050;text-transform:uppercase;}
+.inv-title-sub{font-size:0.46rem;letter-spacing:0.25em;color:#5a4228;font-style:italic;margin-left:1.2rem;}
+.inv-title-wrap{display:flex;align-items:baseline;}
+.inv-close-btn{background:linear-gradient(180deg,#1c1408,#100e06);border:1px solid #5a4220;color:#7a5a30;padding:4px 12px;cursor:pointer;font-size:0.65rem;font-family:'Georgia',serif;letter-spacing:0.12em;text-transform:uppercase;transition:all 0.15s;}
+.inv-close-btn:hover{border-color:#c8a050;color:#c8a050;}
+.inv-body{display:flex;flex:1;}
+.inv-col-left{width:340px;flex-shrink:0;border-right:1px solid #3a2a10;display:flex;flex-direction:column;}
+.inv-col-center{flex:1;border-right:1px solid #3a2a10;display:flex;flex-direction:column;align-items:center;background:radial-gradient(ellipse at 50% 55%,rgba(0,40,20,0.18) 0%,transparent 70%);}
+.inv-col-right{width:210px;flex-shrink:0;display:flex;flex-direction:column;}
+.inv-sec-hdr{font-size:0.48rem;letter-spacing:0.55em;color:#8a6832;text-transform:uppercase;text-align:center;padding:6px 0 5px;background:linear-gradient(90deg,transparent,rgba(200,160,60,0.06),transparent);border-bottom:1px solid #3a2a10;position:relative;}
+.inv-sec-hdr::before{content:'✦';margin-right:0.6em;font-size:0.36rem;color:#5a4220;}
+.inv-sec-hdr::after{content:'✦';margin-left:0.6em;font-size:0.36rem;color:#5a4220;}
+.inv-hr{height:1px;background:linear-gradient(90deg,transparent,#3a2a10 25%,#5a4020 50%,#3a2a10 75%,transparent);}
+.inv-slot{background:linear-gradient(135deg,#100c06,#080604);border:1px solid #3a2810;box-shadow:inset 0 2px 4px rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:border-color 0.1s,box-shadow 0.1s;}
+.inv-slot:hover{border-color:#9a7830;box-shadow:inset 0 2px 4px rgba(0,0,0,0.6),0 0 10px rgba(180,140,50,0.15);}
+.inv-slot canvas{width:100%;height:100%;display:block;pointer-events:none;}
+.slot-lbl{font-size:0.38rem;letter-spacing:0.05em;color:#4a3618;text-transform:uppercase;text-align:center;line-height:1.5;pointer-events:none;padding:3px;}
+.inv-skills-grid{display:grid;grid-template-columns:repeat(4,52px);gap:4px;padding:8px 10px;}
+.inv-skill-slot{width:52px;height:52px;background:linear-gradient(135deg,#0e0a05,#060403);border:1px solid #2e2010;box-shadow:inset 0 2px 4px rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;}
+.inv-skill-slot .skill-ico{font-size:1.1rem;opacity:0.2;user-select:none;}
+.inv-bag-wrap{padding:8px 10px 10px;}
+.inv-bag-grid{display:grid;grid-template-columns:repeat(6,48px);gap:3px;}
+.inv-bag-slot{width:48px;height:48px;}
+.inv-paperdoll{position:relative;width:320px;height:450px;margin:10px auto 6px;flex-shrink:0;}
+#inv-3d{position:absolute;left:85px;top:68px;width:150px;height:290px;display:block;z-index:1;}
+.inv-eq-slot{width:58px;height:58px;position:absolute;z-index:2;}
+.inv-eq-slot[data-slot="head"]{top:4px;left:131px;}.inv-eq-slot[data-slot="neck"]{top:56px;left:8px;}
+.inv-eq-slot[data-slot="chest"]{top:82px;left:254px;}.inv-eq-slot[data-slot="weapon"]{top:150px;left:8px;}
+.inv-eq-slot[data-slot="back"]{top:158px;left:254px;}.inv-eq-slot[data-slot="shield"]{top:226px;left:8px;}
+.inv-eq-slot[data-slot="gloves"]{top:234px;left:254px;}.inv-eq-slot[data-slot="ring_l"]{top:305px;left:8px;}
+.inv-eq-slot[data-slot="legs"]{top:318px;left:131px;}.inv-eq-slot[data-slot="ring_r"]{top:305px;left:254px;}
+.inv-eq-slot[data-slot="feet"]{top:384px;left:58px;}.inv-eq-slot[data-slot="belt"]{top:384px;left:204px;}
+.inv-eq-slot::before{content:'';position:absolute;background:rgba(180,140,50,0.12);pointer-events:none;}
+.inv-eq-slot[data-slot="neck"]::before,.inv-eq-slot[data-slot="weapon"]::before,.inv-eq-slot[data-slot="shield"]::before,.inv-eq-slot[data-slot="ring_l"]::before{top:50%;right:-24px;width:22px;height:1px;}
+.inv-eq-slot[data-slot="chest"]::before,.inv-eq-slot[data-slot="back"]::before,.inv-eq-slot[data-slot="gloves"]::before,.inv-eq-slot[data-slot="ring_r"]::before{top:50%;left:-24px;width:22px;height:1px;}
+.inv-char-name{font-size:0.54rem;letter-spacing:0.3em;color:#7a5a2a;text-transform:uppercase;text-align:center;font-style:italic;margin-top:4px;}
+.inv-quick-row{display:flex;gap:4px;justify-content:center;}
+.inv-quick-slot{width:58px;height:58px;border:1px solid #5a4020;box-shadow:inset 0 2px 4px rgba(0,0,0,0.8);}
+.inv-quick-slot:hover{border-color:#c8a050;}
+.inv-quick-badge{position:absolute;top:3px;left:4px;font-size:0.5rem;color:#6a5028;pointer-events:none;z-index:1;}
+.inv-quick-hint{font-size:0.4rem;letter-spacing:0.3em;color:#3a2a14;text-transform:uppercase;text-align:center;margin-top:4px;}
+.inv-char-info{padding:10px 12px 6px;border-bottom:1px solid #2a1e0c;}
+.inv-char-bigname{font-size:0.72rem;letter-spacing:0.12em;color:#c8a050;}
+.inv-char-class{font-size:0.44rem;letter-spacing:0.2em;color:#5a4228;text-transform:uppercase;margin-top:3px;font-style:italic;}
+.inv-stats-list{padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px;}
+.inv-stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:rgba(0,0,0,0.35);border:1px solid #221808;border-left:2px solid #4a3418;font-size:0.56rem;letter-spacing:0.06em;color:#6a5030;text-transform:uppercase;}
+.inv-stat-row b{color:#c8a882;font-size:0.6rem;}
+.inv-footer{border-top:1px solid #3a2a10;padding:8px 14px;display:flex;align-items:center;gap:16px;background:linear-gradient(90deg,#0d0a06,#100d07,#0d0a06);}
+.inv-qty{position:absolute;bottom:2px;right:3px;font-size:0.58rem;color:#c8a882;pointer-events:none;text-shadow:0 0 4px #000;}
+.inv-tooltip{position:fixed;z-index:200;display:none;background:linear-gradient(160deg,#181008,#0c0904);border:1px solid #6a4e20;box-shadow:0 0 0 1px #1a1208,0 12px 40px rgba(0,0,0,0.95);padding:10px 13px;min-width:190px;max-width:240px;pointer-events:none;}
+.tt-name{font-size:0.8rem;letter-spacing:0.04em;margin-bottom:3px;text-shadow:0 0 12px currentColor;}
+.tt-rar{font-size:0.48rem;letter-spacing:0.2em;text-transform:uppercase;font-style:italic;margin-bottom:8px;border-bottom:1px solid #2a1e0a;padding-bottom:6px;}
+.tt-row{display:flex;justify-content:space-between;font-size:0.6rem;color:#6a5a40;margin-bottom:3px;}
+.tt-row b{color:#c8a882;}
+.tt-desc{margin-top:8px;font-size:0.58rem;font-style:italic;color:#5a4a30;border-top:1px solid #2a1a0a;padding-top:7px;line-height:1.75;}
+.inv-ghost{position:fixed;width:58px;height:58px;pointer-events:none;z-index:300;display:none;opacity:0.88;}
+.inv-ghost canvas{width:100%;height:100%;display:block;}
+.inv-dragging{opacity:0.18;}
+.inv-use-toast{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#0d0a06,#181008);border:1px solid #6a4e20;box-shadow:0 0 20px rgba(0,0,0,0.9);padding:7px 18px;font-family:'Georgia',serif;font-size:0.62rem;letter-spacing:0.12em;color:#c8a882;pointer-events:none;opacity:0;transition:opacity 0.25s;white-space:nowrap;z-index:500;}
+.inv-use-toast.show{opacity:1;}`;
+    document.head.appendChild(s);
+}
+
+// ─────────────────────────────────────────────────────────
 //  DONNÉES
 // ─────────────────────────────────────────────────────────
 
@@ -107,16 +183,86 @@ function drawIcon(item) {
         c.fill(); c.stroke();
         c.fillStyle = '#080606'; c.fillRect(21,9,12,8);
     } else if (t === 'consumable') {
-        c.fillStyle = '#0a200f';
+        // Couleur du liquide selon subtype
+        const liq = item.subtype === 'hp'       ? '#aa2020' :
+                    item.subtype === 'stamina'   ? '#20aa50' :
+                    item.subtype === 'food'      ? '#c8a050' : '#3aaa5a';
+        c.fillStyle = liq + '30';
         c.beginPath();
         c.moveTo(22,19); c.bezierCurveTo(11,26,10,38,18,43); c.lineTo(36,43);
         c.bezierCurveTo(44,38,43,26,32,19); c.closePath();
         c.fill();
-        c.strokeStyle = '#3aaa5a'; c.stroke();
+        c.strokeStyle = liq; c.stroke();
         c.strokeStyle = r.color; c.strokeRect(22,10,10,11);
         c.beginPath(); c.moveTo(25,10); c.lineTo(29,10); c.stroke();
-        c.fillStyle = '#1a6030';
+        c.fillStyle = liq + '90';
         c.beginPath(); c.ellipse(27,34,6,9,0,0,Math.PI*2); c.fill();
+    } else if (t === 'axe') {
+        // Manche
+        c.beginPath(); c.moveTo(32,10); c.lineTo(20,44); c.stroke();
+        // Lame
+        c.beginPath(); c.moveTo(32,10); c.bezierCurveTo(44,8,46,22,34,24);
+        c.lineTo(26,16); c.closePath(); c.fill(); c.stroke();
+    } else if (t === 'pickaxe') {
+        // Manche
+        c.beginPath(); c.moveTo(14,42); c.lineTo(40,18); c.stroke();
+        // Tête courbée
+        c.beginPath(); c.moveTo(33,11); c.bezierCurveTo(46,12,46,24,40,18);
+        c.moveTo(40,18); c.bezierCurveTo(34,12,26,14,22,10);
+        c.stroke();
+        c.beginPath(); c.arc(40,18,3,0,Math.PI*2); c.fill();
+    } else if (t === 'food') {
+        // Pomme/carotte générique
+        c.fillStyle = r.color + '40';
+        c.beginPath(); c.ellipse(27,32,13,14,0,0,Math.PI*2); c.fill(); c.stroke();
+        // Queue
+        c.beginPath(); c.moveTo(27,18); c.lineTo(27,10); c.stroke();
+        // Feuille
+        c.beginPath(); c.moveTo(27,13); c.bezierCurveTo(34,8,38,14,33,16);
+        c.closePath(); c.fill();
+    } else if (t === 'key') {
+        // Anneau
+        c.lineWidth = 2.5;
+        c.beginPath(); c.arc(19,19,9,0,Math.PI*2); c.stroke();
+        c.lineWidth = 1.8;
+        // Tige
+        c.beginPath(); c.moveTo(27,19); c.lineTo(44,19); c.stroke();
+        // Dents
+        c.beginPath(); c.moveTo(38,19); c.lineTo(38,25); c.stroke();
+        c.beginPath(); c.moveTo(43,19); c.lineTo(43,23); c.stroke();
+        // Trou de l'anneau
+        c.fillStyle = '#080606';
+        c.beginPath(); c.arc(19,19,4,0,Math.PI*2); c.fill();
+    } else if (t === 'torch') {
+        // Manche
+        c.beginPath(); c.moveTo(27,48); c.lineTo(27,28); c.lineWidth=3; c.stroke(); c.lineWidth=1.8;
+        // Flamme
+        c.fillStyle = '#e06010';
+        c.beginPath(); c.moveTo(27,28); c.bezierCurveTo(18,22,16,10,27,8);
+        c.bezierCurveTo(38,10,36,22,27,28); c.fill();
+        c.fillStyle = r.color + '90';
+        c.beginPath(); c.moveTo(27,26); c.bezierCurveTo(21,21,20,13,27,11);
+        c.bezierCurveTo(34,13,33,21,27,26); c.fill();
+    } else if (t === 'scroll') {
+        // Parchemin enroulé
+        c.fillStyle = r.color + '20';
+        c.fillRect(12,14,30,26); c.strokeRect(12,14,30,26);
+        // Rouleaux haut/bas
+        c.beginPath(); c.ellipse(27,14,15,4,0,0,Math.PI*2); c.fill(); c.stroke();
+        c.beginPath(); c.ellipse(27,40,15,4,0,0,Math.PI*2); c.fill(); c.stroke();
+        // Lignes de texte
+        c.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            c.beginPath(); c.moveTo(17,21+i*6); c.lineTo(37,21+i*6); c.stroke();
+        }
+        c.lineWidth = 1.8;
+    } else if (t === 'tool') {
+        // Clé anglaise / outil générique
+        c.beginPath(); c.moveTo(14,40); c.lineTo(38,16); c.stroke();
+        c.beginPath(); c.arc(11,43,5,0,Math.PI*2); c.fill(); c.stroke();
+        c.beginPath();
+        c.moveTo(38,16); c.lineTo(44,10); c.lineTo(42,8); c.lineTo(36,14);
+        c.closePath(); c.fill(); c.stroke();
     } else {
         c.beginPath();
         c.moveTo(27,8); c.lineTo(46,27); c.lineTo(27,46); c.lineTo(8,27);
@@ -128,32 +274,153 @@ function drawIcon(item) {
 }
 
 // ─────────────────────────────────────────────────────────
+//  CATALOGUE — tous les items Quaternius + narratifs
+// ─────────────────────────────────────────────────────────
+
+const ITEM_CATALOG = {
+    // ── Armes ─────────────────────────────────────────────
+    sword_bronze:   { id:'sword_bronze',   name:'Bronze Sword',    type:'weapon',  slot:'weapon',  rarity:'common',
+        stats:{'Damage':'8–14','Speed':'Normal'},  desc:"Forged from early bronze. Still holds an edge.",
+        model:'Sword_Bronze', effect:{ weapon:'Sword_Bronze' } },
+    axe_bronze:     { id:'axe_bronze',     name:'Bronze Axe',      type:'axe',     slot:'weapon',  rarity:'common',
+        stats:{'Damage':'10–16','Speed':'Slow'},   desc:"Brutal and reliable. Favoured by soldiers.",
+        model:'Axe_Bronze', effect:{ weapon:'Axe_Bronze' } },
+    pickaxe_bronze: { id:'pickaxe_bronze', name:'Bronze Pickaxe',  type:'pickaxe', slot:'weapon',  rarity:'common',
+        stats:{'Damage':'6–12','Speed':'Slow'},    desc:"A miner's tool, repurposed for war.",
+        model:'Pickaxe_Bronze', effect:{ weapon:'Pickaxe_Bronze' } },
+    knife:          { id:'knife',          name:'Table Knife',      type:'weapon',  slot:'weapon',  rarity:'common',
+        stats:{'Damage':'2–5','Speed':'Fast'},     desc:"Not made for killing. Works anyway.",
+        model:'Table_Knife', effect:{ weapon:'Table_Knife' } },
+    shield_wooden:  { id:'shield_wooden',  name:'Wooden Shield',   type:'shield',  slot:'shield',  rarity:'common',
+        stats:{'Armor':'+8','Block':'60%'},        desc:"Oak planks bound with iron. Heavy but solid.",
+        model:'Shield_Wooden', effect:{ weapon:'Shield_Wooden' } },
+
+    // ── Potions ────────────────────────────────────────────
+    potion_health:      { id:'potion_health',     name:'Health Potion',      type:'consumable', subtype:'hp',      slot:null, rarity:'uncommon',
+        stats:{'Heals':'+30 HP'},       desc:"A warm red draught. Smells of iron and herbs.",
+        model:'Potion_1', effect:{ hp:30 } },
+    potion_health_lg:   { id:'potion_health_lg',  name:'Greater Health Pot', type:'consumable', subtype:'hp',      slot:null, rarity:'rare',
+        stats:{'Heals':'+60 HP'},       desc:"Concentrated. Bitter. Burns on the way down.",
+        model:'Potion_4', effect:{ hp:60 } },
+    potion_stamina:     { id:'potion_stamina',     name:'Stamina Tonic',      type:'consumable', subtype:'stamina', slot:null, rarity:'uncommon',
+        stats:{'Restores':'+40 Stamina'}, desc:"A green tonic. Gives you that second wind.",
+        model:'Potion_2', effect:{ stamina:40 } },
+    potion_minor:       { id:'potion_minor',       name:'Minor Vial',         type:'consumable', subtype:'hp',      slot:null, rarity:'common',
+        stats:{'Heals':'+10 HP'},       desc:"A small vial. Better than nothing.",
+        model:'SmallBottle', effect:{ hp:10 } },
+    chalice:            { id:'chalice',            name:'Blessed Chalice',    type:'consumable', subtype:'hp',      slot:null, rarity:'rare',
+        stats:{'Heals':'+20 HP','+20 Stamina':''}, desc:"A goblet touched by something old.",
+        model:'Chalice', effect:{ hp:20, stamina:20 } },
+    antidote:           { id:'antidote',           name:'Antidote',           type:'consumable', subtype:'stamina', slot:null, rarity:'uncommon',
+        stats:{'Restores':'Full Stamina'}, desc:"Clears the body of all poison.",
+        model:'Bottle_1', effect:{ stamina:100 } },
+
+    // ── Nourriture ─────────────────────────────────────────
+    carrot:     { id:'carrot',   name:'Carrot',       type:'consumable', subtype:'food', slot:null, rarity:'common',
+        stats:{'Heals':'+8 HP'},  desc:"Fresh from the field. Crunchy.",
+        model:'Carrot', effect:{ hp:8 } },
+    apple:      { id:'apple',    name:'Apple',        type:'consumable', subtype:'food', slot:null, rarity:'common',
+        stats:{'Heals':'+12 HP'}, desc:"Red and firm. A traveller's staple.",
+        model:'FarmCrate_Apple', effect:{ hp:12 } },
+    ale:        { id:'ale',      name:'Mug of Ale',   type:'consumable', subtype:'food', slot:null, rarity:'common',
+        stats:{'Stamina':'+20','HP':'-5'}, desc:"Strong brew. You'll feel it in your legs.",
+        model:'Mug', effect:{ stamina:20, hp:-5 } },
+
+    // ── Outils & clés ──────────────────────────────────────
+    torch:      { id:'torch',     name:'Torch',       type:'torch', slot:null, rarity:'common',
+        stats:{'Light':'Medium'}, desc:"Burns for an hour. Keep it away from the powder.",
+        model:'Torch_Metal' },
+    key_gold:   { id:'key_gold',  name:'Gold Key',    type:'key',   slot:null, rarity:'rare',
+        stats:{'Opens':'Unknown'}, desc:"An ornate key. You don't know what it opens.",
+        model:'Key_Gold' },
+    key_iron:   { id:'key_iron',  name:'Iron Key',    type:'key',   slot:null, rarity:'common',
+        stats:{'Opens':'Iron locks'}, desc:"A plain key. Heavy.",
+        model:'Key_Metal' },
+    rope:       { id:'rope',      name:'Rope',        type:'tool',  slot:null, rarity:'common',
+        stats:{'Length':'10m'}, desc:"Useful for climbing. Or other things.",
+        model:'Rope_1' },
+    whetstone:  { id:'whetstone', name:'Whetstone',   type:'tool',  slot:null, rarity:'common',
+        stats:{'Restores':'Weapon edge'}, desc:"A grey river stone. Keeps blades sharp.",
+        model:'Whetstone' },
+
+    // ── Parchemins & livres ────────────────────────────────
+    scroll_1:   { id:'scroll_1', name:'Old Scroll',    type:'scroll', slot:null, rarity:'uncommon',
+        stats:{'Type':'Text'}, desc:"The ink has faded. A few words remain.",
+        model:'Scroll_1' },
+    scroll_map: { id:'scroll_map', name:'Map Scroll',  type:'scroll', slot:null, rarity:'uncommon',
+        stats:{'Type':'Map'}, desc:"A rough map. The roads are barely marked.",
+        model:'Scroll_2' },
+
+    // ── Monnaie & divers ───────────────────────────────────
+    coin:       { id:'coin',      name:'Gold Coin',    type:'misc', slot:null, rarity:'common',   qty:1,
+        stats:{}, desc:"Standard currency. Worth something, somewhere.",
+        model:'Coin' },
+    coin_pile:  { id:'coin_pile', name:'Coin Pile',    type:'misc', slot:null, rarity:'uncommon', qty:1,
+        stats:{'Gold':'~50'}, desc:"A small fortune. Don't lose it.",
+        model:'Coin_Pile' },
+    bag:        { id:'bag',       name:'Travel Bag',   type:'misc', slot:null, rarity:'common',
+        stats:{}, desc:"Empty. Useful.",
+        model:'Bag' },
+    pouch:      { id:'pouch',     name:'Pouch',        type:'misc', slot:null, rarity:'common',
+        stats:{}, desc:"Worn leather. Smells of old coin.",
+        model:'Pouch_Large' },
+    chain:      { id:'chain',     name:'Iron Chain',   type:'misc', slot:null, rarity:'common',
+        stats:{}, desc:"Heavy links. Could restrain something.",
+        model:'Chain_Coil' },
+
+    // ── Items narratifs (existants) ─────────────────────────
+    exile_blade:   { id:'exile_blade',   name:"Exile's Blade",      type:'weapon',  slot:'weapon',  rarity:'common',
+        stats:{'Damage':'4–8','Speed':'Normal'}, desc:"A forgotten sword. It has killed before you.",
+        effect:{ weapon:'Sword_Bronze' } },
+    leather_chest: { id:'leather_chest', name:'Leather Cuirass',    type:'chest',   slot:'chest',   rarity:'common',
+        stats:{'Armor':'12','Weight':'Light'},    desc:"Tanned in sweat and salt." },
+    iron_helm:     { id:'iron_helm',     name:'Iron Helm',           type:'head',    slot:'head',    rarity:'uncommon',
+        stats:{'Armor':'8','Cold Res':'+5%'},     desc:"Bears a mark no one recognizes." },
+    travel_boots:  { id:'travel_boots',  name:'Travel Boots',        type:'feet',    slot:'feet',    rarity:'common',
+        stats:{'Armor':'4','Stamina':'+2'},        desc:"Worn by a thousand miles." },
+    worn_belt:     { id:'worn_belt',     name:'Soldier\'s Belt',     type:'belt',    slot:'belt',    rarity:'common',
+        stats:{'Pocket':'+4 quick'},               desc:"Braided leather, broken buckle." },
+    health_vial:   { id:'health_vial',   name:'Dark Sap Vial',       type:'consumable', subtype:'hp', slot:null, rarity:'common',
+        stats:{'Heals':'+8 HP'},  desc:"Bitter. Effective.", effect:{ hp:8 } },
+    eitr_shard:    { id:'eitr_shard',    name:"Eitr Shard",          type:'misc',    slot:null,      rarity:'rare',
+        stats:{'Magic':'+2'},     desc:'"It should not exist."' },
+    bone_ring:     { id:'bone_ring',     name:"Bone Ring",           type:'ring',    slot:'ring_l',  rarity:'uncommon',
+        stats:{'Skill':'+1','Magic':'+1'}, desc:"Carved from something one should not carve." },
+    old_dagger:    { id:'old_dagger',    name:'Rusted Dagger',       type:'weapon',  slot:'shield',  rarity:'common',
+        stats:{'Damage':'1–4','Parry':'+3'}, desc:"A short blade. Enough for a throat.",
+        effect:{ weapon:'Table_Knife' } },
+};
+
+function item(id, qty = 1) {
+    const base = ITEM_CATALOG[id];
+    if (!base) return null;
+    return { ...base, qty };
+}
+
+// ─────────────────────────────────────────────────────────
 //  ITEMS DE DÉPART
 // ─────────────────────────────────────────────────────────
 
 function makeStarting() {
     const eq = [
-        { id:'exile_blade',    name:"Lame d'exilé",        type:'weapon',     slot:'weapon',  rarity:'common',
-          stats:{'Dégâts':'4–8','Vitesse':'Normal'},          desc:"Une épée oubliée. Elle a tué avant toi." },
-        { id:'leather_chest',  name:'Cuirasse de cuir',     type:'chest',      slot:'chest',   rarity:'common',
-          stats:{'Armure':'12','Poids':'Léger'},               desc:"Tannée à la sueur et au sel." },
-        { id:'iron_helm',      name:'Heaume de fer',        type:'head',       slot:'head',    rarity:'uncommon',
-          stats:{'Armure':'8','Résistance Froid':'+5%'},       desc:"Porte une marque qu'on ne reconnaît plus." },
-        { id:'travel_boots',   name:'Bottes de voyage',     type:'feet',       slot:'feet',    rarity:'common',
-          stats:{'Armure':'4','Endurance':'+2'},                desc:"Usées par mille lieues." },
-        { id:'worn_belt',      name:'Ceinture de soldat',   type:'belt',       slot:'belt',    rarity:'common',
-          stats:{'Poche':'+4 rapide'},                          desc:"Cuir tressé, boucle brisée." },
+        item('exile_blade'), item('leather_chest'), item('iron_helm'),
+        item('travel_boots'), item('worn_belt'),
     ];
     const bag = [
-        { id:'health_vial', name:'Fiole de sève noire', type:'consumable', slot:null, rarity:'common',   qty:3,
-          stats:{'Soin':'+8 Endurance'},  desc:"Amère. Efficace." },
-        { id:'eitr_shard',  name:"Éclat d'Eitr",        type:'misc',       slot:null, rarity:'rare',     qty:1,
-          stats:{'Magie':'+2'},            desc:'"Il ne devrait pas exister."' },
-        { id:'bone_ring',   name:"Anneau d'os",          type:'ring',       slot:'ring_l', rarity:'uncommon', qty:1,
-          stats:{'Habileté':'+1','Magie':'+1'}, desc:"Taillé dans quelque chose qu'on ne taille pas." },
-        { id:'old_dagger',  name:'Dague rouillée',       type:'weapon',     slot:'shield', rarity:'common',  qty:1,
-          stats:{'Dégâts':'1–4','Parade':'+3'}, desc:"Une lame courte. Assez pour une gorge." },
-    ];
+        item('sword_bronze'),     item('axe_bronze'),
+        item('pickaxe_bronze'),   item('shield_wooden'),
+        item('potion_health', 3), item('potion_stamina', 2),
+        item('potion_health_lg'), item('potion_minor', 5),
+        item('chalice'),          item('antidote', 2),
+        item('carrot', 4),        item('apple', 3),
+        item('ale', 2),
+        item('torch', 2),         item('key_gold'),
+        item('key_iron', 2),      item('rope'),
+        item('whetstone'),
+        item('scroll_1'),         item('scroll_map'),
+        item('coin', 12),         item('coin_pile'),
+        item('health_vial', 3),   item('eitr_shard'),
+    ].filter(Boolean);
     return { eq, bag };
 }
 
@@ -162,12 +429,16 @@ function makeStarting() {
 // ─────────────────────────────────────────────────────────
 
 export class InventorySystem {
-    constructor(playerRef) {
+    constructor(playerRef, { onEquip, onUse } = {}) {
+        _injectCSS();
         this.player   = playerRef;
         this.equipped = Object.fromEntries(Object.keys(SLOT_DEFS).map(k => [k, null]));
         this.bag      = new Array(24).fill(null);
         this.quick    = new Array(4).fill(null);
         this.isOpen   = false;
+
+        this._onEquip = onEquip || null;
+        this._onUse   = onUse   || null;
 
         this._drag          = null;
         this._previewAngle  = 0;
@@ -176,8 +447,11 @@ export class InventorySystem {
         this._previewCam    = null;
         this._charMesh      = null;
         this._eitrGlow      = null;
+        this._toastEl       = null;
+        this._toastTimer    = null;
 
         this._buildDOM();
+        this._buildToast();
         this._init3D();
         this._populate();
         this._refreshStats();
@@ -625,12 +899,24 @@ export class InventorySystem {
             }
         });
 
-        // Double-clic : équiper depuis sac / déséquiper vers sac
+        // Double-clic : utiliser (consommable) ou équiper/déséquiper
         root.addEventListener('dblclick', e => {
             const el = e.target.closest('[data-slot],[data-bag-idx],[data-quick-idx]');
             if (!el) return;
             const { item, src } = this._itemAt(el);
             if (!item) return;
+
+            // Consommable (potion, nourriture) → utiliser directement
+            const isConsumable = item.type === 'consumable' ||
+                (item.effect && (item.effect.hp !== undefined || item.effect.stamina !== undefined)
+                 && !item.effect.weapon);
+
+            if (isConsumable && (src.type === 'bag' || src.type === 'quick')) {
+                this.use(item, src);
+                return;
+            }
+
+            // Équipable → équiper / déséquiper
             if (src.type === 'bag' || src.type === 'quick') {
                 this._autoEquip(item, src);
             } else if (src.type === 'equip') {
@@ -719,6 +1005,10 @@ export class InventorySystem {
         this._rerenderAt(src);
         this._renderEqSlot(slot);
         this._refreshStats();
+        // Déclencher l'équipement en jeu pour les armes
+        if (this._onEquip && item.effect?.weapon) {
+            this._onEquip(item);
+        }
     }
 
     _autoUnequip(item, slot) {
@@ -742,11 +1032,18 @@ export class InventorySystem {
         const statsHtml = Object.entries(item.stats || {})
             .map(([k,v]) => `<div class="tt-row"><span>${k}</span><b>${v}</b></div>`)
             .join('');
+        const isConsumable = item.type === 'consumable' ||
+            (item.effect && (item.effect.hp !== undefined || item.effect.stamina !== undefined) && !item.effect.weapon);
+        const isEquippable = item.slot && SLOT_DEFS[item.slot];
+        const hint = isConsumable ? 'Double-clic : Utiliser'
+                   : isEquippable ? 'Double-clic : Équiper'
+                   : '';
         this._tooltip.innerHTML =
             `<div class="tt-name" style="color:${r.color}">${item.name}</div>` +
             `<div class="tt-rar" style="color:${r.color}88">${r.label}${(item.qty||1)>1?' ×'+item.qty:''}</div>` +
             statsHtml +
-            (item.desc ? `<div class="tt-desc">${item.desc}</div>` : '');
+            (item.desc ? `<div class="tt-desc">${item.desc}</div>` : '') +
+            (hint ? `<div style="margin-top:7px;font-size:0.48rem;letter-spacing:0.18em;color:#4a3618;text-transform:uppercase;">${hint}</div>` : '');
         this._tooltip.style.display = 'block';
         this._moveTip(e);
     }
@@ -764,6 +1061,69 @@ export class InventorySystem {
         const item = this.quick[i];
         if (!item) return null;
         return drawIcon(item);
+    }
+
+    // ─── Toast de feedback ─────────────────────────────────
+    _buildToast() {
+        const t = document.createElement('div');
+        t.className = 'inv-use-toast';
+        this._root.querySelector('.inv-panel').appendChild(t);
+        this._toastEl = t;
+    }
+
+    _showToast(msg) {
+        if (!this._toastEl) return;
+        clearTimeout(this._toastTimer);
+        this._toastEl.textContent = msg;
+        this._toastEl.classList.add('show');
+        this._toastTimer = setTimeout(() => this._toastEl.classList.remove('show'), 1800);
+    }
+
+    // ─── Utiliser un item ─────────────────────────────────
+    /**
+     * Tente d'utiliser l'item.  Retourne true si quelque chose a été consommé.
+     * src : { type:'bag'|'quick', index:number }
+     */
+    use(item, src) {
+        if (!item?.effect) return false;
+
+        // Les armes passent par _autoEquip → _onEquip, pas par use()
+        if (item.effect.weapon && !item.effect.hp && !item.effect.stamina) return false;
+
+        const p = this.player;
+        let msgs = [];
+
+        if (item.effect.hp !== undefined) {
+            const before = p.hp || 0;
+            p.hp = Math.max(0, Math.min(p.maxHp || 100, before + item.effect.hp));
+            const delta = Math.round(p.hp - before);
+            if (delta > 0) msgs.push(`+${delta} Vie`);
+            else if (delta < 0) msgs.push(`${delta} Vie`);
+        }
+
+        if (item.effect.stamina !== undefined) {
+            const before = p.stamina || 0;
+            p.stamina = Math.max(0, Math.min(p.maxStamina || 100, before + item.effect.stamina));
+            const delta = Math.round(p.stamina - before);
+            if (delta > 0) msgs.push(`+${delta} Endurance`);
+            else if (delta < 0) msgs.push(`${delta} Endurance`);
+        }
+
+        if (msgs.length === 0) return false;
+
+        // Consommer depuis la source
+        if (src.type === 'bag' || src.type === 'quick') {
+            const loc = this._getAt(src);
+            if (loc) {
+                if (loc.qty > 1) { loc.qty--; this._rerenderAt(src); }
+                else             { this._setAt(src, null); this._rerenderAt(src); }
+            }
+        }
+
+        this._refreshStats();
+        this._onUse?.(item);
+        this._showToast(`${item.name} — ${msgs.join(' · ')}`);
+        return true;
     }
 
     // ─── Open / Close ────────────────────────────────────────

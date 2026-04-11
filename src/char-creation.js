@@ -68,8 +68,16 @@ const BEARDS = [
     { val:'Hair_Beard', label:'Beard' },
 ];
 
-// ClipMap minimal — juste l'idle pour la preview
-const CLIP_MAP = { idle:'Idle_Loop' };
+// ClipMap — assez de clips pour que le fallback de CharacterController trouve l'idle
+const CLIP_MAP = {
+    idle       : 'Idle_Loop',
+    walk       : 'Walk_Loop',
+    run        : 'Sprint_Loop',
+    jump       : 'Jump_Start',
+    fall       : 'Jump_Loop',
+    crouch_idle: 'Crouch_Idle_Loop',
+    crouch_walk: 'Crouch_Fwd_Loop',
+};
 
 // PlayerState statique pour la preview (position, état)
 const PREVIEW_PS = {
@@ -206,10 +214,21 @@ const CSS = `
 /* ── Preview ── */
 #cc-preview { flex:1; position:relative; overflow:hidden; }
 #cc-canvas   { width:100%; height:100%; display:block; }
+/* Gradient bas — fondu vers le sol */
+#cc-preview::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:120px;
+    background:linear-gradient(to top, rgba(8,10,12,0.5) 0%, transparent 100%);
+    pointer-events:none;
+}
 #cc-hint {
     position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
-    font-size:8px; letter-spacing:2px; color:rgba(200,184,154,0.18);
+    font-size:8px; letter-spacing:2px; color:rgba(200,184,154,0.22);
     text-transform:uppercase; pointer-events:none; white-space:nowrap;
+    z-index:1;
+}
+/* Indicateur scroll panel */
+#cc-panel-inner::after {
+    content:''; display:block; height:20px;
 }
 #cc-loading {
     position:absolute; inset:0; display:flex; align-items:center;
@@ -319,34 +338,48 @@ function createPreviewScene(canvas) {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x080a0c);
-    scene.fog = new THREE.Fog(0x080a0c, 8, 20);
+    scene.fog = new THREE.Fog(0x080a0c, 10, 22);
 
-    // Sol
-    const grid = new THREE.GridHelper(6, 12, 0x1a1610, 0x0f0d09);
+    // Sol — cercle discret sous le personnage
+    const grid = new THREE.GridHelper(8, 16, 0x161210, 0x0d0b09);
     scene.add(grid);
 
-    // Éclairage atmosphérique
-    scene.add(new THREE.AmbientLight(0xc8b89a, 0.55));
-    const key = new THREE.DirectionalLight(0xfff0dd, 1.3);
-    key.position.set(2, 5, 3); scene.add(key);
-    const fill = new THREE.DirectionalLight(0x3355aa, 0.4);
-    fill.position.set(-3, 2, -2); scene.add(fill);
-    const rim = new THREE.DirectionalLight(0xffeedd, 0.7);
-    rim.position.set(0, 4, -5); scene.add(rim);
+    // Halo sol — disque lumineux sous les pieds
+    const haloGeo = new THREE.CircleGeometry(0.6, 32);
+    const haloMat = new THREE.MeshBasicMaterial({
+        color:0x2a2010, transparent:true, opacity:0.6, depthWrite:false
+    });
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.001;
+    scene.add(halo);
 
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 50);
-    camera.position.set(0, 0.95, 3.0);
+    // Éclairage — plus généreux
+    scene.add(new THREE.AmbientLight(0xc8b89a, 0.75));
+    const key = new THREE.DirectionalLight(0xfff4e0, 1.6);
+    key.position.set(2.5, 5, 3); scene.add(key);
+    const fill = new THREE.DirectionalLight(0x334466, 0.5);
+    fill.position.set(-3, 2, -1); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffe8cc, 0.9);
+    rim.position.set(0, 4, -5); scene.add(rim);
+    // Backlight chaud pour la profondeur
+    const back = new THREE.DirectionalLight(0x553322, 0.4);
+    back.position.set(0, 1, -3); scene.add(back);
+
+    // Caméra — recule et monte pour voir le personnage entier
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+    camera.position.set(0, 1.05, 4.2);
 
     const controls = new OrbitControls(camera, canvas);
-    controls.target.set(0, 0.9, 0);
+    controls.target.set(0, 0.85, 0);
     controls.enableDamping    = true;
     controls.dampingFactor    = 0.07;
-    controls.minDistance      = 1.0;
-    controls.maxDistance      = 6.0;
+    controls.minDistance      = 1.5;
+    controls.maxDistance      = 7.0;
     controls.minPolarAngle    = Math.PI * 0.1;
-    controls.maxPolarAngle    = Math.PI * 0.88;
+    controls.maxPolarAngle    = Math.PI * 0.85;
     controls.autoRotate       = true;
-    controls.autoRotateSpeed  = 0.7;
+    controls.autoRotateSpeed  = 0.6;
     controls.update();
 
     return { renderer, scene, camera, controls };
@@ -451,7 +484,7 @@ export function showCharCreation({ allowSkip = false } = {}) {
             }
 
             ctrl = newCtrl;
-            preview.controls.target.set(0, 0.9, 0);
+            preview.controls.target.set(0, 0.85, 0);
             preview.controls.update();
             setLoading(false);
         }
