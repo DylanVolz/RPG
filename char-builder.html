@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Character Builder</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+/* ══ Panel ══ */
+#panel {
+    width:260px; flex-shrink:0; background:#080a0c;
+    border-right:1px solid rgba(200,184,154,0.08);
+    display:flex; flex-direction:column; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:#1a1410 transparent;
+}
+.section { border-bottom:1px solid rgba(200,184,154,0.07); padding:10px 12px; }
+.section-title {
+    font-size:8px; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3); margin-bottom:8px;
+}
+.btn-grid { display:flex; flex-wrap:wrap; gap:4px; }
+.opt-btn {
+    flex:1; min-width:calc(50% - 2px);
+    background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.12);
+    color:rgba(200,184,154,0.45); padding:7px 6px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s;
+    text-align:center; text-transform:uppercase; line-height:1.4;
+}
+.opt-btn:hover  { background:rgba(200,184,154,0.1); color:rgba(200,184,154,0.8); }
+.opt-btn.active { background:rgba(200,184,154,0.18); color:#c8b89a;
+                  border-color:rgba(200,184,154,0.45); }
+.opt-btn.full   { min-width:100%; }
+.opt-btn.muted  { color:rgba(200,184,154,0.25); font-style:italic; }
+.outfit-split   { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.outfit-col     { display:flex; flex-direction:column; gap:4px; }
+.col-hdr        { text-align:center; font-size:10px; color:rgba(200,184,154,0.35);
+                  padding:2px 0; letter-spacing:1px; text-transform:uppercase; }
+.outfit-col .opt-btn { min-width:100%; }
+.opt-btn.toggle-on { background:rgba(180,140,80,0.2); border-color:rgba(200,160,80,0.5); color:#d4a84b; }
+.eye-btn {
+    flex-shrink:0; width:22px; height:22px; line-height:22px; text-align:center;
+    background:rgba(200,184,154,0.08); border:1px solid rgba(200,184,154,0.2);
+    color:rgba(200,184,154,0.7); font-size:11px; cursor:pointer;
+    transition:all 0.1s; border-radius:2px; user-select:none;
+}
+.eye-btn:hover { background:rgba(200,184,154,0.18); }
+.eye-btn.off { background:rgba(200,184,154,0.03); border-color:rgba(200,184,154,0.08); color:rgba(200,184,154,0.2); }
+
+/* Sliders morphologie */
+.slider-row { display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+.slider-label { display:flex; justify-content:space-between; font-size:9px;
+    letter-spacing:1px; color:rgba(200,184,154,0.45); text-transform:uppercase; }
+.slider-label span { color:rgba(200,184,154,0.7); font-size:9px; }
+input[type=range] {
+    width:100%; height:3px; appearance:none; -webkit-appearance:none;
+    background:rgba(200,184,154,0.18); border-radius:2px; outline:none; cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:13px; height:13px;
+    border-radius:50%; background:#c8b89a; cursor:pointer;
+    border:2px solid rgba(13,15,18,0.8);
+}
+input[type=range]::-moz-range-thumb {
+    width:13px; height:13px; border-radius:50%; background:#c8b89a;
+    cursor:pointer; border:2px solid rgba(13,15,18,0.8);
+}
+
+/* Couleur cheveux */
+.color-grid { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
+.cswatch {
+    width:22px; height:22px; border-radius:50%; cursor:pointer;
+    border:2px solid transparent; transition:border-color 0.1s, transform 0.1s;
+    flex-shrink:0;
+}
+.cswatch:hover  { transform:scale(1.15); }
+.cswatch.active { border-color:rgba(200,184,154,0.8); }
+#hair-color-custom {
+    width:100%; height:26px; padding:1px 2px; cursor:pointer;
+    border:1px solid rgba(200,184,154,0.12); background:rgba(200,184,154,0.05);
+    border-radius:2px;
+}
+
+/* Animations */
+#ual-row { display:flex; gap:4px; margin-bottom:8px; }
+.ual-btn {
+    flex:1; background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.12);
+    color:rgba(200,184,154,0.4); padding:5px; font-size:9px; letter-spacing:2px;
+    cursor:pointer; transition:all 0.1s; text-align:center; text-transform:uppercase;
+}
+.ual-btn:hover, .ual-btn.active {
+    background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4);
+}
+#clip-search {
+    width:100%; background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:7px 8px; font-family:'Georgia',serif;
+    font-size:10px; outline:none; margin-bottom:6px;
+}
+#clip-search::placeholder { color:rgba(200,184,154,0.2); }
+#clip-list { display:flex; flex-direction:column; gap:2px; }
+.clip-btn {
+    background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.08);
+    color:rgba(200,184,154,0.5); padding:5px 8px; font-size:9px; letter-spacing:0.5px;
+    cursor:pointer; transition:all 0.08s; display:flex; justify-content:space-between;
+}
+.clip-btn:hover  { background:rgba(200,184,154,0.09); color:rgba(200,184,154,0.8); }
+.clip-btn.active { background:rgba(200,184,154,0.16); color:#fff; border-color:rgba(200,184,154,0.35); }
+.clip-btn .dur   { font-size:8px; opacity:0.35; margin-left:6px; flex-shrink:0; }
+
+/* Collapsible */
+.collapse-toggle {
+    display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer; user-select:none; margin-bottom:0;
+    color:rgba(200,184,154,0.5);
+}
+.collapse-toggle:hover { color:rgba(200,184,154,0.8); }
+.collapse-toggle .chevron { font-size:11px; opacity:0.7; transition:transform 0.15s; margin-left:4px; }
+.collapse-toggle.open .chevron { transform:rotate(90deg); opacity:1; }
+#proportions-body { margin-top:8px; }
+.reset-btn {
+    flex-shrink:0; width:18px; height:18px; line-height:18px; text-align:center;
+    background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.12);
+    color:rgba(200,184,154,0.35); font-size:11px; cursor:pointer;
+    border-radius:2px; transition:all 0.1s; user-select:none;
+}
+.reset-btn:hover { background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.35); }
+.sub-title {
+    font-size:8px; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3); margin-bottom:6px;
+}
+
+#status-bar {
+    padding:8px 12px; font-size:9px; letter-spacing:1px;
+    color:rgba(200,184,154,0.25); margin-top:auto;
+    border-top:1px solid rgba(200,184,154,0.07);
+}
+
+/* ══ Panneau droit ══ */
+#rightpanel {
+    width:280px; flex-shrink:0; background:#080a0c;
+    border-left:1px solid rgba(200,184,154,0.08);
+    display:flex; flex-direction:column; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:#1a1410 transparent;
+}
+#config-name-input {
+    width:100%; background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:7px 8px; font-family:'Georgia',serif;
+    font-size:10px; outline:none; margin-bottom:6px; transition:border-color 0.2s;
+}
+#config-name-input::placeholder { color:rgba(200,184,154,0.2); }
+#config-name-input.error { border-color:rgba(200,80,80,0.5); }
+#config-list { display:flex; flex-direction:column; gap:2px; }
+.config-item {
+    display:flex; align-items:center; gap:4px;
+    background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.08);
+    padding:5px 8px; transition:border-color 0.1s;
+}
+.config-item:hover { border-color:rgba(200,184,154,0.18); }
+.config-item.active-config { border-color:rgba(200,184,154,0.35); background:rgba(200,184,154,0.08); }
+.config-item-name {
+    flex:1; font-size:9px; letter-spacing:0.5px; color:rgba(200,184,154,0.65);
+    text-transform:uppercase; cursor:pointer; padding:2px 0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.config-item-name:hover { color:#c8b89a; }
+.config-action {
+    flex-shrink:0; background:none; border:1px solid rgba(200,184,154,0.12);
+    color:rgba(200,184,154,0.4); padding:3px 6px; font-size:8px;
+    cursor:pointer; transition:all 0.1s; letter-spacing:0.5px; white-space:nowrap;
+}
+.config-action:hover { background:rgba(200,184,154,0.1); color:#c8b89a; }
+.config-action.export { border-color:rgba(180,140,80,0.3); color:rgba(200,160,80,0.5); }
+.config-action.export:hover { background:rgba(180,140,80,0.15); color:#d4a84b; border-color:rgba(200,160,80,0.5); }
+.config-action.del { border-color:rgba(200,80,80,0.2); color:rgba(200,80,80,0.35); }
+.config-action.del:hover { background:rgba(200,80,80,0.1); color:rgba(220,100,100,0.8); border-color:rgba(200,80,80,0.4); }
+#export-toast {
+    font-size:9px; text-align:center; padding:5px 0; letter-spacing:2px;
+    color:rgba(160,220,130,0.75); display:none;
+}
+
+/* ══ Viewport ══ */
+#viewport { flex:1; position:relative; }
+#viewport canvas { display:block; width:100%!important; height:100%!important; }
+#vp-hint {
+    position:absolute; bottom:14px; right:14px;
+    color:rgba(200,184,154,0.15); font-size:9px; line-height:2; text-align:right; pointer-events:none;
+}
+#vp-loading {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(200,184,154,0.35); font-size:10px; letter-spacing:4px; text-transform:uppercase;
+    display:none; pointer-events:none;
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="panel">
+
+    <div class="section">
+        <div class="section-title">Corps</div>
+        <div class="btn-grid" id="body-btns">
+            <div class="opt-btn active" data-body="M">♂ Masculin</div>
+            <div class="opt-btn"        data-body="F">♀ Féminin</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Outfit</div>
+        <div id="outfit-btns">
+            <div class="opt-btn full muted" data-outfit="" style="margin-bottom:4px">— Aucun —</div>
+            <div class="outfit-split">
+                <div class="outfit-col">
+                    <div class="col-hdr">♂ Mâle</div>
+                    <div class="opt-btn active" data-outfit="Male_Ranger">Ranger</div>
+                    <div class="opt-btn"        data-outfit="Male_Peasant">Peasant</div>
+                    <div class="opt-btn"        data-outfit="Male_Knight">Knight</div>
+                    <div class="opt-btn"        data-outfit="Male_Knight_Cloth">Knight Cloth</div>
+                    <div class="opt-btn"        data-outfit="Male_Noble">Noble</div>
+                    <div class="opt-btn"        data-outfit="Male_Wizard">Wizard</div>
+                </div>
+                <div class="outfit-col">
+                    <div class="col-hdr">♀ Femelle</div>
+                    <div class="opt-btn" data-outfit="Female_Ranger">Ranger</div>
+                    <div class="opt-btn" data-outfit="Female_Peasant">Peasant</div>
+                    <div class="opt-btn" data-outfit="Female_Knight">Knight</div>
+                    <div class="opt-btn" data-outfit="Female_Knight_Cloth">Knight Cloth</div>
+                    <div class="opt-btn" data-outfit="Female_Noble">Noble</div>
+                    <div class="opt-btn" data-outfit="Female_Wizard">Wizard</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Variante texture</div>
+        <div class="btn-grid" id="tex-btns">
+            <div class="opt-btn active" data-tex="1">Couleur 1</div>
+            <div class="opt-btn"        data-tex="2">Couleur 2</div>
+            <div class="opt-btn"        data-tex="3">Couleur 3</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Coiffure</div>
+        <div class="btn-grid" id="hair-btns">
+            <div class="opt-btn full muted active" data-hair="">— Aucune —</div>
+            <div class="opt-btn" data-hair="Hair_Long">Long</div>
+            <div class="opt-btn" data-hair="Hair_SimpleParted">Parted</div>
+            <div class="opt-btn" data-hair="Hair_Buzzed">Buzzed ♂</div>
+            <div class="opt-btn" data-hair="Hair_BuzzedFemale">Buzzed ♀</div>
+            <div class="opt-btn" data-hair="Hair_Buns">Buns</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Barbe</div>
+        <div class="btn-grid" id="beard-btns">
+            <div class="opt-btn full muted active" data-beard="">— Aucune —</div>
+            <div class="opt-btn full" data-beard="Hair_Beard">Barbe</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Couleur cheveux &amp; barbe</div>
+        <div class="color-grid" id="hair-colors"></div>
+        <input type="color" id="hair-color-custom" value="#3d2b1a" title="Couleur personnalisée">
+    </div>
+
+    <div class="section">
+        <div class="section-title">Couleur des yeux</div>
+        <div class="color-grid" id="eye-colors"></div>
+        <input type="color" id="eye-color-custom" value="#3a7ab5" title="Couleur personnalisée">
+    </div>
+
+    <div class="section">
+        <div class="section-title">Couleur de peau</div>
+        <div class="color-grid" id="skin-colors"></div>
+        <input type="color" id="skin-color-custom" value="#d4956a" title="Couleur personnalisée">
+    </div>
+
+    <div class="section" id="proportions-section" style="display:none;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:0;">
+            <div class="section-title collapse-toggle" id="proportions-toggle" style="flex:1;margin-bottom:0;font-size:9px;letter-spacing:3px;">
+                Proportions <span class="chevron">▸</span>
+            </div>
+            <div class="opt-btn" id="proportions-reset-btn" title="Réinitialiser toutes les proportions"
+                 style="flex-shrink:0;min-width:0;padding:3px 7px;font-size:10px;">↺</div>
+        </div>
+        <div id="proportions-body" style="display:none;">
+            <div class="sub-title" style="margin-top:8px;">Corps</div>
+            <div id="mesh-sliders-body"></div>
+            <div class="sub-title" style="margin-top:12px;">Outfit</div>
+            <div id="mesh-sliders-outfit"></div>
+        </div>
+    </div>
+
+    <div id="status-bar">—</div>
+</div>
+
+<div id="viewport">
+    <div id="vp-loading">Chargement...</div>
+    <div id="vp-hint">Clic droit : orbiter · Molette : zoom</div>
+</div>
+
+<div id="rightpanel">
+
+    <div class="section">
+        <div class="section-title">Configurations</div>
+        <input id="config-name-input" type="text" placeholder="Nom du personnage...">
+        <div class="btn-grid">
+            <div class="opt-btn full" id="config-save-btn">+ Sauvegarder la config actuelle</div>
+        </div>
+        <div id="export-toast">Exporté vers le jeu ✓</div>
+        <div style="margin-top:8px;" id="config-list"></div>
+    </div>
+
+    <div class="section" style="flex:1;display:flex;flex-direction:column;">
+        <div class="section-title">Animations</div>
+        <div id="ual-row">
+            <div class="ual-btn" data-ual="1">UAL 1</div>
+            <div class="ual-btn" data-ual="3">UAL 1 Src</div>
+            <div class="ual-btn active" data-ual="2">UAL 2</div>
+            <div class="ual-btn" data-ual="4">UAL 2 Src</div>
+        </div>
+        <input id="clip-search" type="text" placeholder="Filtrer clips...">
+        <div id="clip-list" style="overflow-y:auto;flex:1;"></div>
+    </div>
+
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// ── Chemins ───────────────────────────────────────────────────
+const P_OUTFIT = 'assets/characters/outfits/';
+const P_HAIR   = 'assets/characters/hair/';
+const P_BODY   = { M:'assets/characters/bodies/Superhero_Male_FullBody.gltf',
+                   F:'assets/characters/bodies/Superhero_Female_FullBody.gltf' };
+const P_UAL    = { 1:'assets/characters/animations/UAL1_Standard.glb',
+                   2:'assets/characters/animations/UAL2_Standard.glb',
+                   3:'assets/characters/animations/UAL1_Source.glb',
+                   4:'assets/characters/animations/UAL2_Source.glb' };
+
+// ── Scène ─────────────────────────────────────────────────────
+const vp = document.getElementById('viewport');
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x111418);
+scene.fog = new THREE.FogExp2(0x111418, 0.045);
+
+const camera = new THREE.PerspectiveCamera(50, vp.clientWidth/vp.clientHeight, 0.05, 100);
+camera.position.set(0, 1.4, 3.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(vp.clientWidth, vp.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.localClippingEnabled = true;
+vp.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.9, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.07;
+controls.minDistance = 0.5; controls.maxDistance = 12;
+controls.update();
+
+scene.add(new THREE.AmbientLight(0xffd8a0, 0.65));
+const sun = new THREE.DirectionalLight(0xfff4d0, 2.8);
+sun.position.set(4,8,4); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x8090c0, 0.7); fill.position.set(-4,3,-4); scene.add(fill);
+const rim  = new THREE.DirectionalLight(0xffaa44, 1.0); rim.position.set(0,4,-5);   scene.add(rim);
+
+const floorMesh = new THREE.Mesh(new THREE.CircleGeometry(8,48),
+    new THREE.MeshStandardMaterial({color:0x151210,roughness:0.95}));
+floorMesh.rotation.x=-Math.PI/2; floorMesh.receiveShadow=true; scene.add(floorMesh);
+const ringMesh = new THREE.Mesh(new THREE.RingGeometry(1.0,1.06,64),
+    new THREE.MeshBasicMaterial({color:0x3a2e1a,side:THREE.DoubleSide}));
+ringMesh.rotation.x=-Math.PI/2; ringMesh.position.y=0.002; scene.add(ringMesh);
+
+// ── Cache GLTF ────────────────────────────────────────────────
+const gltfCache = {};
+const loader = new GLTFLoader();
+function loadCached(url) {
+    if (gltfCache[url]) return Promise.resolve(gltfCache[url]);
+    return new Promise((res,rej) => loader.load(url, g => { gltfCache[url]=g; res(g); }, undefined, rej));
+}
+
+// ── État ──────────────────────────────────────────────────────
+const state = { body:'M', outfit:'Male_Ranger', hair:'', beard:'', texVariant:1 };
+let outfitRoot = null, bodyRoot = null;
+let mixerOutfit = null, mixerBody = null;
+let activeActionOutfit = null, activeActionBody = null;
+let ualGltf = null, currentUAL = 2, allClips = [], clipFilter = '';
+let headBone = null;
+const headWP = new THREE.Vector3();
+
+let slots = { body:[], hair:[], beard:[] };
+let outfitMeshes = []; // meshes du outfit cloned — trackés pour visibilité
+let hairColor = new THREE.Color('#3d2b1a');
+let eyeColor  = new THREE.Color('#3a7ab5');
+let skinColor = new THREE.Color('#d4956a'); // uniforme initial (inactif — uSkinBlend=0 par défaut)
+let skinColorActive = false;               // false = texture naturelle, true = teinte active
+
+// Deux maps de bones indépendantes
+let liveBoneMap_outfit = {}, liveBoneMap_body = {};
+const boneScaleOverrides_outfit = {}, boneScaleOverrides_body = {};
+
+// Positions de repos (T-Pose) — capturées une fois après rebuild
+// Utilisées comme base stable pour le contre-ajustement (évite l'accumulation)
+let boneRestPos_outfit = {}, boneRestPos_body = {};
+let neckBodyHidden = false; // true quand Cou & Épaules body est caché → clip remonte
+
+// Scales à restaurer après le prochain rebuild() (chargement config)
+let _pendingBoneScales = null;
+
+const HAIR_PRESETS = [
+    '#0a0a0a','#1c1008','#3d2b1a','#6b3d1e',
+    '#8b5a2b','#b8832a','#d4b86a','#f0e0a0',
+    '#c44020','#8a1a1a','#888888','#e8e8e8',
+];
+
+// ── Détection générique par bones (fonctionne avec n'importe quel pack Quaternius) ──
+// Un mesh "tête-lié" : a neck_01 ou Head dans son squelette → attacher au bodyRoot
+function isHeadRelatedMesh(mesh) {
+    return mesh.isSkinnedMesh &&
+        mesh.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
+}
+
+// Un mesh "corps complet" : a spine + neck/Head → reçoit le shader neck+head only
+// Distinct des yeux/sourcils qui n'ont que Head (sans spine)
+function isBodyShaderMesh(mesh) {
+    if (!mesh.skeleton) return false;
+    const names = new Set(mesh.skeleton.bones.map(b => b.name));
+    return (names.has('neck_01') || names.has('Head')) &&
+           (names.has('spine_01') || names.has('spine_02') || names.has('spine_03'));
+}
+
+// ── Créer un SkinnedMesh rebindé SANS déplacer le nœud source ──
+// Le GLTF caché reste intact — on crée toujours de nouveaux objets
+function makeReboundMesh(srcNode, outfitBones, clipped) {
+    const newBones = srcNode.skeleton.bones.map(b => outfitBones[b.name] || null);
+    if (newBones.some(b => !b)) return null;
+
+    const clonedMats = (Array.isArray(srcNode.material)
+        ? srcNode.material : [srcNode.material]).map(m => m ? m.clone() : m);
+
+    const mesh = new THREE.SkinnedMesh(srcNode.geometry,
+        Array.isArray(srcNode.material) ? clonedMats : clonedMats[0]);
+    mesh.name = srcNode.name;
+    mesh.bindMode = srcNode.bindMode;
+
+    const newSkel = new THREE.Skeleton(newBones, srcNode.skeleton.boneInverses);
+    mesh.bind(newSkel, new THREE.Matrix4());
+
+    const isBody = isBodyShaderMesh(srcNode);
+    clonedMats.forEach(m => {
+        if (!m) return;
+        m.side = THREE.DoubleSide;
+        // Pas de clip plane — le shader gère entièrement la visibilité par zone
+    });
+    mesh.castShadow = true;
+    mesh.frustumCulled = false;
+    return mesh;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SHADER CORPS — visibilité par zone
+//
+//  Principe : chaque zone du corps (épaules, bras, cuisses…) est
+//  visible UNIQUEMENT si l'outfit correspondant est caché.
+//  Cou + Tête sont TOUJOURS visibles (threshold 0.35 = évite z-fight col).
+//  Compatible avec n'importe quel pack Quaternius (détection par index bone).
+// ═══════════════════════════════════════════════════════════════
+
+// Mapping outfit BONE_GROUPS → uniform de zone corps
+// null = neck/head always visible, pas besoin d'uniform
+const _OUTFIT_TO_BODY_UNIFORM = {
+    clavicle_l: 'uShowShldr', clavicle_r: 'uShowShldr',
+    spine_01:   'uShowChest', spine_02: 'uShowChest', spine_03: 'uShowChest',
+    upperarm_l: 'uShowArms',  upperarm_r: 'uShowArms',
+    lowerarm_l: 'uShowFArms', lowerarm_r: 'uShowFArms',
+    hand_l:     'uShowHands', hand_r:    'uShowHands',
+    pelvis:     'uShowThighs',
+    thigh_l:    'uShowThighs',thigh_r:   'uShowThighs',
+    calf_l:     'uShowCalves',calf_r:    'uShowCalves',
+    foot_l:     'uShowFeet',  foot_r:    'uShowFeet',
+};
+const _ALL_BODY_ZONES = ['uShowShldr','uShowChest','uShowArms','uShowFArms',
+                         'uShowHands','uShowThighs','uShowCalves','uShowFeet'];
+
+function getOutfitGroupBodyUniform(grp) {
+    for (const bone of grp.bones) {
+        const u = _OUTFIT_TO_BODY_UNIFORM[bone];
+        if (u) return u;
+    }
+    return null; // Tête, Cou → pas d'uniform (toujours visibles)
+}
+
+function injectBodyGroupShader(mesh) {
+    const sk = mesh.skeleton.bones;
+    const bi = n => sk.findIndex(b => b.name === n);
+
+    if (bi('neck_01') < 0 && bi('Head') < 0) return;
+
+    // ── Collecte tous les indices de bones d'un sous-arbre (inclusif) ──
+    function treeIdx(boneName) {
+        const out = [];
+        function walk(name) {
+            const i = bi(name); if (i < 0) return;
+            out.push(i);
+            sk[i].children.forEach(c => { if (c.isBone) walk(c.name); });
+        }
+        walk(boneName);
+        return out;
+    }
+
+    // ── Génère une expression GLSL de poids pour un ensemble d'indices ──
+    // Indices baked dans le shader → pas d'uniform array, 100% fiable
+    // ex: zoneExpr([3,7]) → "(ix==3.0||ix==7.0?wx:0.0)+(iy==...)+..."
+    function zoneExpr(indices) {
+        if (!indices.length) return '0.0';
+        const ck = v => '(' + indices.map(i => `${v}==${i}.0`).join('||') + ')';
+        return `(${ck('ix')}?wx:0.0)+(${ck('iy')}?wy:0.0)+(${ck('iz')}?wz:0.0)+(${ck('iw')}?ww:0.0)`;
+    }
+
+    // Indices par zone
+    const si = (...names) => names.map(n => bi(n)).filter(i => i >= 0);
+    const zones = {
+        neckHead : si('neck_01','Head'),
+        shoulder : si('clavicle_l','clavicle_r'),
+        chest    : si('spine_01','spine_02','spine_03','pelvis'),
+        arm      : si('upperarm_l','upperarm_r'),
+        forearm  : si('lowerarm_l','lowerarm_r'),
+        hand     : [...new Set([...treeIdx('hand_l'), ...treeIdx('hand_r')])],
+        thigh    : [...new Set([...si('thigh_l','thigh_r','pelvis')])],
+        calf     : si('calf_l','calf_r'),
+        foot     : [...new Set([...treeIdx('foot_l'), ...treeIdx('foot_r')])],
+    };
+
+    // ── Uniforms zones — créés AVANT onBeforeCompile (pré-rendu ✓) ──
+    const bodyZoneUnis = {
+        uShowShldr:{value:0.0}, uShowChest:{value:0.0},
+        uShowArms: {value:0.0}, uShowFArms:{value:0.0},
+        uShowHands:{value:0.0}, uShowThighs:{value:0.0},
+        uShowCalves:{value:0.0},uShowFeet:  {value:0.0},
+        uSkinColor: {value: new THREE.Color(skinColor)},
+        uSkinBlend: {value: skinColorActive ? 1.0 : 0.0},
+    };
+
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(m => {
+        if (!m) return;
+        m.onBeforeCompile = shader => {
+            Object.assign(shader.uniforms, bodyZoneUnis);
+
+            shader.vertexShader = shader.vertexShader.replace('#include <skinning_pars_vertex>',
+`#include <skinning_pars_vertex>
+varying float vNeckHeadW,vShldrW,vChestW,vArmW,vFArmW,vHndW,vThghW,vClfW,vFtW;`);
+
+            shader.vertexShader = shader.vertexShader.replace('#include <skinning_vertex>',
+`#include <skinning_vertex>
+{
+float ix=float(skinIndex.x),iy=float(skinIndex.y),iz=float(skinIndex.z),iw=float(skinIndex.w);
+float wx=skinWeight.x,wy=skinWeight.y,wz=skinWeight.z,ww=skinWeight.w;
+vNeckHeadW=${zoneExpr(zones.neckHead)};
+vShldrW   =${zoneExpr(zones.shoulder)};
+vChestW   =${zoneExpr(zones.chest)};
+vArmW     =${zoneExpr(zones.arm)};
+vFArmW    =${zoneExpr(zones.forearm)};
+vHndW     =${zoneExpr(zones.hand)};
+vThghW    =${zoneExpr(zones.thigh)};
+vClfW     =${zoneExpr(zones.calf)};
+vFtW      =${zoneExpr(zones.foot)};
+}`);
+
+            shader.fragmentShader = shader.fragmentShader.replace('void main() {',
+`varying float vNeckHeadW,vShldrW,vChestW,vArmW,vFArmW,vHndW,vThghW,vClfW,vFtW;
+uniform float uShowShldr,uShowChest,uShowArms,uShowFArms,uShowHands,uShowThighs,uShowCalves,uShowFeet;
+uniform vec3  uSkinColor;
+uniform float uSkinBlend;
+void main() {
+float keep=0.;
+if(vNeckHeadW>0.35) keep=1.;
+if(uShowShldr >0.5&&vShldrW >0.25) keep=1.;
+if(uShowChest >0.5&&vChestW >0.25) keep=1.;
+if(uShowArms  >0.5&&vArmW   >0.25) keep=1.;
+if(uShowFArms >0.5&&vFArmW  >0.25) keep=1.;
+if(uShowHands >0.5&&vHndW   >0.25) keep=1.;
+if(uShowThighs>0.5&&vThghW  >0.25) keep=1.;
+if(uShowCalves>0.5&&vClfW   >0.25) keep=1.;
+if(uShowFeet  >0.5&&vFtW    >0.25) keep=1.;
+if(keep<0.5) discard;`);
+
+            // Tint peau : luminance-matching exact + normalisation par canal max
+            // (évite l'orange shift causé par le clipping asymétrique du canal R)
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                `#include <map_fragment>
+if (uSkinBlend > 0.0) {
+    float lum  = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    float sLum = max(dot(uSkinColor,   vec3(0.299, 0.587, 0.114)), 0.001);
+    // Mise à l'échelle : la couleur sélectionnée apparaît sur les pixels à sLum
+    vec3 tinted = uSkinColor * (lum / sLum);
+    // Normaliser par le canal max → pas de clipping asymétrique (pas d'orange shift)
+    tinted /= max(max(tinted.r, max(tinted.g, tinted.b)), 1.0);
+    diffuseColor.rgb = mix(diffuseColor.rgb, tinted, uSkinBlend);
+}`
+            );
+        };
+        m.userData.bodyZoneUniforms = bodyZoneUnis;
+        m.needsUpdate = true;
+    });
+}
+
+// Active/désactive une zone du corps (uniformName = uShowChest, uShowArms, etc.)
+// Fonctionne AVANT le 1er rendu car bodyZoneUniforms est créé avant onBeforeCompile
+function setBodyZone(uniformName, show) {
+    const v = show ? 1.0 : 0.0;
+    slots.body.forEach(m => {
+        if (!isBodyShaderMesh(m)) return;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        mats.forEach(mat => {
+            if (mat?.userData?.bodyZoneUniforms?.[uniformName] !== undefined)
+                mat.userData.bodyZoneUniforms[uniformName].value = v;
+        });
+    });
+}
+
+// Appelé par le toggle mesh-level (Visibilité section) pour les meshes outfit
+function syncBodyShaderToOutfit() {
+    if (!slots.body.some(isBodyShaderMesh)) return; // pas de body shader actif
+    const anyOutfitVisible = outfitMeshes.some(m => m.visible);
+    // Tout outfit caché → montrer TOUTES les zones corps
+    // Tout outfit visible → cacher toutes les zones (les bone-group-toggles gèrent le reste)
+    _ALL_BODY_ZONES.forEach(u => setBodyZone(u, !anyOutfitVisible));
+}
+
+// ── Attacher depuis un GLTF dans un slot ──────────────────────
+// body/hair/beard → bodyRoot ; sinon → outfitRoot
+function slotRoot(slot) {
+    return (slot === 'body' || slot === 'hair' || slot === 'beard') ? bodyRoot : outfitRoot;
+}
+
+function attachFromGltf(gltf, boneMap, filterFn, slot, clipped) {
+    const root = slotRoot(slot);
+    slots[slot].forEach(m => root && root.remove(m));
+    slots[slot] = [];
+
+    gltf.scene.traverse(srcNode => {
+        if (!srcNode.isSkinnedMesh || !filterFn(srcNode)) return;
+        const mesh = makeReboundMesh(srcNode, boneMap, clipped);
+        if (!mesh) { console.warn('Os manquant:', srcNode.name); return; }
+        root.add(mesh);
+        slots[slot].push(mesh);
+    });
+}
+
+// ── Shader couleur iris ───────────────────────────────────────
+// Le mesh MI_Eyes a 1 seul matériau, couleur portée entièrement par la texture.
+// On injecte un shader qui identifie l'iris par la luminance du pixel texturé
+// (iris sombre, sclère claire) et mixer la couleur utilisateur uniquement là.
+function injectEyeShader(mesh) {
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(m => {
+        if (!m) return;
+        // Uniforms accessibles immédiatement (avant le 1er rendu)
+        const eyeUniforms = {
+            uIrisColor:   { value: new THREE.Color(eyeColor) },
+            uIrisEnabled: { value: 0.0 },
+        };
+        m.onBeforeCompile = shader => {
+            Object.assign(shader.uniforms, eyeUniforms);
+            // Uniforms déclarés AVANT void main() — obligatoire en GLSL
+            shader.fragmentShader = shader.fragmentShader.replace(
+                'void main() {',
+                `uniform vec3  uIrisColor;
+uniform float uIrisEnabled;
+void main() {`
+            );
+            // Code iris injecté APRÈS le sampling de la texture (dans main)
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                `#include <map_fragment>
+if (uIrisEnabled > 0.5) {
+    float lum  = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+    // Seuils calibrés en espace linéaire (Three.js converti sRGB→linear avant ce point)
+    // iris/pupille : lum 0.0–0.3 → mask proche de 1
+    // sclère : lum > 0.45 → mask = 0 (non coloré)
+    float mask = 1.0 - smoothstep(0.08, 0.45, lum);
+    diffuseColor.rgb = mix(diffuseColor.rgb, uIrisColor, mask * 0.88);
+}`
+            );
+        };
+        m.userData.eyeUniforms = eyeUniforms;
+        m.needsUpdate = true;
+    });
+}
+
+function applyEyeColor(color) {
+    slots.body.forEach(mesh => {
+        if (mesh.name.toLowerCase() !== 'eyes') return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => {
+            if (!m?.userData?.eyeUniforms) return;
+            m.userData.eyeUniforms.uIrisColor.value.set(color);
+            m.userData.eyeUniforms.uIrisEnabled.value = 1.0;
+        });
+    });
+}
+
+function applyHairColor(color) {
+    ['hair','beard'].forEach(slot => {
+        slots[slot].forEach(mesh => {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach(m => { if (m) m.color.set(color); });
+        });
+    });
+    // Sourcils aussi (dans le slot body)
+    slots.body.forEach(mesh => {
+        if (mesh.name.toLowerCase() === 'eyebrows') {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach(m => { if (m) m.color.set(color); });
+        }
+    });
+}
+
+function applySkinColor() {
+    const blend = skinColorActive ? 1.0 : 0.0;
+    slots.body.forEach(mesh => {
+        if (!isBodyShaderMesh(mesh)) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => {
+            const u = m?.userData?.bodyZoneUniforms;
+            if (!u) return;
+            u.uSkinColor.value.set(skinColor);
+            u.uSkinBlend.value = blend;
+        });
+    });
+}
+
+function clearSlot(slot) {
+    const root = slotRoot(slot);
+    slots[slot].forEach(m => root && root.remove(m));
+    slots[slot] = [];
+}
+
+// ── Variante texture (swap BaseColor après rebuild) ───────────
+const _texLoader = new THREE.TextureLoader();
+function applyTexVariant() {
+    if (state.texVariant === 1 || state.outfit === '' || !outfitMeshes.length) return;
+    const outfitType = state.outfit.replace(/^(Male|Female)_/, '').replace(/_Cloth$/, '');
+    const url = P_OUTFIT + 'T_' + outfitType + '_' + state.texVariant + '_BaseColor.png';
+    _texLoader.load(url, tex => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        outfitMeshes.forEach(m => {
+            const mats = Array.isArray(m.material) ? m.material : [m.material];
+            mats.forEach(mat => {
+                if (mat && mat.map) { mat.map = tex; mat.needsUpdate = true; }
+            });
+        });
+    }, undefined, () => { /* variante indisponible pour cet outfit */ });
+}
+
+// ── Reconstruction complète (outfit ou corps changé) ──────────
+async function rebuild() {
+    setStatus('Chargement...');
+    document.getElementById('vp-loading').style.display = 'block';
+
+    if (activeActionOutfit) { activeActionOutfit.stop(); activeActionOutfit=null; }
+    if (activeActionBody)   { activeActionBody.stop();  activeActionBody=null; }
+    if (mixerOutfit) { mixerOutfit.stopAllAction(); mixerOutfit=null; }
+    if (mixerBody)   { mixerBody.stopAllAction();   mixerBody=null; }
+    if (outfitRoot)  { scene.remove(outfitRoot); outfitRoot=null; }
+    if (bodyRoot)    { scene.remove(bodyRoot);   bodyRoot=null; }
+    slots = { body:[], hair:[], beard:[] };
+    headBone = null;
+
+    try {
+        const noOutfit = state.outfit === '';
+        const [bodyGltf, outfitGltf, hairGltf, beardGltf] = await Promise.all([
+            loadCached(P_BODY[state.body]),
+            noOutfit ? Promise.resolve(null) : loadCached(P_OUTFIT + state.outfit + '.gltf'),
+            state.hair  ? loadCached(P_HAIR + state.hair  + '.gltf') : Promise.resolve(null),
+            state.beard ? loadCached(P_HAIR + state.beard + '.gltf') : Promise.resolve(null),
+        ]);
+
+        const baseGltf = noOutfit ? bodyGltf : outfitGltf;
+
+        // ── outfitRoot : rend l'outfit (ou le body si noOutfit) ──
+        const oRoot = SkeletonUtils.clone(baseGltf.scene);
+        oRoot.traverse(c => {
+            if (!c.isMesh) return;
+            c.castShadow=true; c.receiveShadow=true; c.frustumCulled=false;
+            (Array.isArray(c.material)?c.material:[c.material]).forEach(m=>{if(m)m.side=THREE.DoubleSide;});
+        });
+        const b0 = new THREE.Box3().setFromObject(oRoot);
+        oRoot.scale.setScalar(1.75 / (b0.max.y - b0.min.y));
+        const b1 = new THREE.Box3().setFromObject(oRoot);
+        oRoot.position.y = -b1.min.y;
+        outfitRoot = oRoot;
+        scene.add(outfitRoot);
+        mixerOutfit = new THREE.AnimationMixer(outfitRoot);
+
+        liveBoneMap_outfit = {};
+        outfitMeshes = [];
+        outfitRoot.traverse(n => {
+            if (n.isBone)       liveBoneMap_outfit[n.name] = n;
+            if (n.isSkinnedMesh) outfitMeshes.push(n);
+        });
+
+        // ── bodyRoot : squelette séparé pour body/hair/beard ──────
+        const bRoot = SkeletonUtils.clone(baseGltf.scene);
+        bRoot.scale.copy(outfitRoot.scale);
+        bRoot.position.copy(outfitRoot.position);
+        // Masquer les meshes du clone — on attachera les nôtres
+        bRoot.traverse(c => { if (c.isMesh) c.visible = false; });
+        bodyRoot = bRoot;
+        scene.add(bodyRoot);
+        mixerBody = new THREE.AnimationMixer(bodyRoot);
+
+        liveBoneMap_body = {};
+        bodyRoot.traverse(n => { if (n.isBone) liveBoneMap_body[n.name] = n; });
+        headBone = liveBoneMap_body['Head'] || liveBoneMap_body['head'] || null;
+
+        // Reset overrides bone et capturer les positions de repos (T-Pose)
+        Object.keys(boneScaleOverrides_outfit).forEach(k => delete boneScaleOverrides_outfit[k]);
+        Object.keys(boneScaleOverrides_body).forEach(k => delete boneScaleOverrides_body[k]);
+        boneRestPos_outfit = {};
+        boneRestPos_body   = {};
+        neckBodyHidden = false;
+        outfitRoot.traverse(n => { if (n.isBone) boneRestPos_outfit[n.name] = n.position.clone(); });
+        bodyRoot.traverse(n =>   { if (n.isBone) boneRestPos_body[n.name]   = n.position.clone(); });
+
+        if (noOutfit) {
+            // Pour noOutfit, body = outfitRoot — on expose ses meshes dans slots.body pour la couleur
+            outfitRoot.traverse(n => { if (n.isSkinnedMesh) slots.body.push(n); });
+        } else {
+            attachFromGltf(bodyGltf, liveBoneMap_body, isHeadRelatedMesh, 'body', true);
+            // Injecter les shaders body (avant le 1er rendu)
+            // Yeux EN PREMIER : leur squelette contient aussi spine_01/02/03,
+            // donc isBodyShaderMesh retournerait true pour eux si on ne les intercepte pas avant
+            slots.body.forEach(m => {
+                if (m.name.toLowerCase() === 'eyes') injectEyeShader(m);
+                else if (isBodyShaderMesh(m)) injectBodyGroupShader(m);
+            });
+        }
+
+        if (hairGltf)  attachFromGltf(hairGltf,  liveBoneMap_body, () => true, 'hair',  false);
+        if (beardGltf) attachFromGltf(beardGltf,  liveBoneMap_body, () => true, 'beard', false);
+        applyHairColor(hairColor);
+        applyEyeColor(eyeColor);
+        applySkinColor();
+
+        // Animations sur les deux mixers
+        if (ualGltf) buildClips(); else loadUAL(currentUAL);
+
+        // Appliquer les scales chargés depuis une config (avant buildMeshSliders)
+        if (_pendingBoneScales) {
+            Object.assign(boneScaleOverrides_body,   _pendingBoneScales.body   || {});
+            Object.assign(boneScaleOverrides_outfit, _pendingBoneScales.outfit || {});
+            _pendingBoneScales = null;
+        }
+
+        buildMeshSliders();
+        buildVisibilityToggles();
+        applyTexVariant();
+        document.getElementById('vp-loading').style.display = 'none';
+        updateStatus();
+
+    } catch(err) {
+        document.getElementById('vp-loading').style.display = 'none';
+        setStatus('⚠ ' + err.message); console.error(err);
+    }
+}
+
+// ── Swap hair/beard indépendamment (sans rebuild complet) ──────
+async function swapSlot(slot, gltfName) {
+    if (!outfitRoot) return;
+    clearSlot(slot);
+    if (!gltfName) { updateStatus(); return; }
+
+    const gltf = await loadCached(P_HAIR + gltfName + '.gltf');
+    attachFromGltf(gltf, liveBoneMap_body, () => true, slot, false);
+    applyHairColor(hairColor);
+    buildVisibilityToggles();
+    updateStatus();
+}
+
+// ── Animations ────────────────────────────────────────────────
+function loadUAL(n) {
+    currentUAL = n;
+    ualGltf = null;
+    document.getElementById('clip-list').innerHTML =
+        '<div style="padding:6px 8px;font-size:9px;opacity:.3;letter-spacing:2px">Chargement UAL'+n+'...</div>';
+    loadCached(P_UAL[n]).then(gltf => { ualGltf=gltf; if(mixerOutfit) buildClips(); }).catch(console.error);
+}
+
+function buildClips() {
+    allClips = ualGltf.animations
+        .map(clip => THREE.AnimationClip.parse(THREE.AnimationClip.toJSON(clip)))
+        .sort((a,b)=>a.name.localeCompare(b.name));
+    renderClips();
+}
+
+function renderClips() {
+    const term = clipFilter.toLowerCase();
+    const list = allClips.filter(c=>!term||c.name.toLowerCase().includes(term));
+    const el = document.getElementById('clip-list');
+    el.innerHTML = '';
+    list.forEach(clip => {
+        const btn = document.createElement('div');
+        btn.className='clip-btn'; btn.dataset.name=clip.name;
+        btn.innerHTML=`<span>${clip.name}</span><span class="dur">${clip.duration.toFixed(2)}s</span>`;
+        btn.addEventListener('click',()=>{
+            document.querySelectorAll('.clip-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active'); playClip(clip);
+        });
+        el.appendChild(btn);
+    });
+}
+
+function playClip(clip) {
+    if (!mixerOutfit) return;
+    if (activeActionOutfit) activeActionOutfit.fadeOut(0.2);
+    if (activeActionBody)   activeActionBody.fadeOut(0.2);
+    const ao = mixerOutfit.clipAction(clip);
+    ao.reset().fadeIn(0.2).play();
+    activeActionOutfit = ao;
+    if (mixerBody) {
+        const ab = mixerBody.clipAction(clip);
+        ab.reset().fadeIn(0.2).play();
+        activeActionBody = ab;
+    }
+    document.querySelectorAll('.clip-btn').forEach(b=>b.classList.toggle('active',b.dataset.name===clip.name));
+}
+
+// ── Helpers UI ────────────────────────────────────────────────
+function setActive(selector, key, val) {
+    document.querySelectorAll(selector).forEach(b =>
+        b.classList.toggle('active', b.dataset[key] === val));
+}
+function setStatus(msg) { document.getElementById('status-bar').textContent = msg; }
+function updateStatus() {
+    const parts = [state.outfit];
+    if (state.hair)  parts.push(state.hair);
+    if (state.beard) parts.push(state.beard);
+    setStatus(parts.join(' + '));
+}
+
+// ── Événements ────────────────────────────────────────────────
+document.querySelectorAll('#body-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
+    state.body = btn.dataset.body;
+    setActive('#body-btns .opt-btn', 'body', state.body);
+    rebuild();
+}));
+
+document.querySelectorAll('#outfit-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
+    state.outfit = btn.dataset.outfit;
+    setActive('#outfit-btns .opt-btn', 'outfit', state.outfit);
+    rebuild();
+}));
+
+document.querySelectorAll('#tex-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
+    state.texVariant = parseInt(btn.dataset.tex);
+    document.querySelectorAll('#tex-btns .opt-btn').forEach(b => b.classList.toggle('active', b === btn));
+    applyTexVariant();
+}));
+
+document.querySelectorAll('#hair-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
+    state.hair = btn.dataset.hair;
+    setActive('#hair-btns .opt-btn', 'hair', state.hair);
+    swapSlot('hair', state.hair);
+}));
+
+document.querySelectorAll('#beard-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
+    state.beard = btn.dataset.beard;
+    setActive('#beard-btns .opt-btn', 'beard', state.beard);
+    swapSlot('beard', state.beard);
+}));
+
+document.querySelectorAll('.ual-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.ual-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    loadUAL(parseInt(btn.dataset.ual));
+}));
+
+document.getElementById('clip-search').addEventListener('input', e => {
+    clipFilter = e.target.value; renderClips();
+});
+
+// ── Registry UI cross-panel (outfit ↔ corps eye-btn sync) ────
+// label → { body: fn(v), outfit: fn(v) }  — UI seulement, pas de bone/shader
+const _groupEyeRegistry = {};
+
+// ── Sliders proportions par zone (bone scaling) ───────────────
+const BONE_GROUPS = [
+    { label: 'Tête',    bones: ['Head'] },
+    { label: 'Cou',     bones: ['neck_01'] },
+    { label: 'Épaules', bones: ['clavicle_l','clavicle_r'] },
+    { label: 'Chest',         bones: ['spine_01','spine_02','spine_03'] },
+    { label: 'Bras',          bones: ['upperarm_l','upperarm_r'] },
+    { label: 'Avant-bras',    bones: ['lowerarm_l','lowerarm_r'] },
+    { label: 'Mains',         bones: ['hand_l','hand_r'] },
+    { label: 'Cuisses',     bones: ['thigh_l','thigh_r','pelvis'] },
+    { label: 'Mollets',     bones: ['calf_l','calf_r'] },
+    { label: 'Pieds',       bones: ['foot_l','foot_r'] },
+];
+
+// Scales custom à réappliquer APRÈS mixer.update() chaque frame
+const boneScaleOverrides = {}; // boneName → scale
+let liveBoneMap = {};
+
+// ── Visibilité des meshes ─────────────────────────────────────
+const MESH_LABELS = {
+    // Noms connus — les nouveaux packs Quaternius seront détectés automatiquement
+    superhero_male: 'Corps ♂', superhero_female: 'Corps ♀',
+    eyebrows: 'Sourcils', eyes: 'Yeux',
+    hair_long: 'Long', hair_simpleparted: 'Parted',
+    hair_buzzed: 'Buzzed ♂', hair_buzzedfemale: 'Buzzed ♀',
+    hair_buns: 'Buns', hair_beard: 'Barbe',
+};
+
+// meshLabel accepte un mesh OU un nom de string
+function meshLabel(meshOrName) {
+    const name = typeof meshOrName === 'string' ? meshOrName : meshOrName.name;
+    // 1. Nom connu dans le dictionnaire
+    if (MESH_LABELS[name.toLowerCase()]) return MESH_LABELS[name.toLowerCase()];
+    // 2. Nettoyer le nom : retirer préfixe Male_/Female_/Superhero_Pack_/etc.
+    const cleaned = name.replace(/^(Male|Female|Superhero|SuperHero)_[^_]+_?/i, '').replace(/_/g, ' ').trim();
+    if (cleaned) return cleaned;
+    return name;
+}
+
+function makeEyeBtn(mesh, container, onChange = null) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;';
+
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:9px;letter-spacing:1px;color:rgba(200,184,154,0.5);flex:1;text-transform:uppercase;';
+    lbl.textContent = meshLabel(mesh); // passe le mesh complet pour détection générique
+
+    const btn = document.createElement('div');
+    btn.className = 'eye-btn';
+    btn.textContent = '👁';
+    btn.title = 'Afficher / Cacher';
+    btn.addEventListener('click', () => {
+        mesh.visible = !mesh.visible;
+        btn.classList.toggle('off', !mesh.visible);
+        if (onChange) onChange();
+    });
+
+    row.appendChild(lbl);
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+function appendVisibilityBlock(container, meshes, onChange = null) {
+    if (!container || !meshes.length) return;
+    container.querySelectorAll('.vis-row').forEach(el => el.remove());
+
+    const sep = document.createElement('div');
+    sep.className = 'vis-row';
+    sep.style.cssText = 'font-size:8px;letter-spacing:3px;color:rgba(200,184,154,0.25);text-transform:uppercase;padding:6px 0 3px;border-top:1px solid rgba(200,184,154,0.07);margin-top:4px;';
+    sep.textContent = 'Visibilité';
+    container.appendChild(sep);
+
+    for (const mesh of meshes) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'vis-row';
+        makeEyeBtn(mesh, wrapper, onChange);
+        container.appendChild(wrapper);
+    }
+}
+
+function buildVisibilityToggles() {
+    appendVisibilityBlock(
+        document.getElementById('mesh-sliders-body'),
+        [...slots.body, ...slots.hair, ...slots.beard]
+    );
+    // Outfit : sync le shader corps à chaque toggle
+    appendVisibilityBlock(
+        document.getElementById('mesh-sliders-outfit'),
+        outfitMeshes,
+        syncBodyShaderToOutfit
+    );
+}
+
+function makeBoneSliders(containerId, boneMap, overrides) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const side = containerId.includes('outfit') ? 'outfit' : 'body';
+
+    for (const grp of BONE_GROUPS) {
+        const found = grp.bones.filter(n => boneMap[n]);
+        if (!found.length) continue;
+
+        // Initialiser depuis les overrides existants (config chargée)
+        const existingScale = overrides[found[0]];
+        let userScale = (existingScale !== undefined && existingScale > 0.01) ? existingScale : 1.0;
+        const initVal = Math.round(Math.max(50, Math.min(150, userScale * 100)));
+        let visible = true;
+
+        const row = document.createElement('div');
+        row.className = 'slider-row';
+
+        // Rangée label + valeur + bouton œil
+        const top = document.createElement('div');
+        top.className = 'slider-label';
+        const valSpan = document.createElement('span');
+        valSpan.textContent = initVal + '%';
+
+        const eyeBtn = document.createElement('div');
+        eyeBtn.className = 'eye-btn';
+        eyeBtn.textContent = '👁';
+        eyeBtn.title = 'Afficher / Cacher';
+        eyeBtn.style.marginLeft = '4px';
+
+        const resetBtn = document.createElement('div');
+        resetBtn.className = 'reset-btn';
+        resetBtn.textContent = '↺';
+        resetBtn.title = 'Réinitialiser';
+        resetBtn.style.marginLeft = '3px';
+
+        top.innerHTML = `<span>${grp.label}</span>`;
+        top.appendChild(valSpan);
+        top.appendChild(eyeBtn);
+        top.appendChild(resetBtn);
+
+        const sl = document.createElement('input');
+        sl.type = 'range'; sl.min = 50; sl.max = 150; sl.value = initVal; sl.step = 1;
+
+        // syncOutfitToCorps : Tête/Cou sont entièrement indépendants — aucune sync croisée dans les deux sens
+        const syncOutfitToCorps = grp.label !== 'Tête' && grp.label !== 'Cou';
+
+        // Enregistrer une fonction pour la sync cross-panel (tous les groupes, pas de garde)
+        // uiOnly=true → juste CSS (pas de bone scales) — utilisé pour la sync initiale et croisée
+        if (!_groupEyeRegistry[grp.label]) _groupEyeRegistry[grp.label] = {};
+        _groupEyeRegistry[grp.label][side] = (v, uiOnly = false) => {
+            visible = v;
+            eyeBtn.classList.toggle('off', !v);
+            if (!uiOnly) {
+                if (side === 'body') {
+                    // Corps : body zone shader gère la visibilité, pas de squish des bones trunk
+                    const bUniform = getOutfitGroupBodyUniform(grp);
+                    if (bUniform) {
+                        setBodyZone(bUniform, v);
+                        found.forEach(name => { overrides[name] = userScale; }); // garde la proportion
+                    } else {
+                        // Tête/Cou : pas d'uniform → contrôle par bone squish (bones feuilles)
+                        found.forEach(name => { overrides[name] = v ? userScale : 0.001; });
+                    }
+                } else {
+                    found.forEach(name => { overrides[name] = v ? userScale : 0.001; });
+                }
+            }
+        };
+
+        sl.addEventListener('input', e => {
+            userScale = parseInt(e.target.value) / 100;
+            valSpan.textContent = e.target.value + '%';
+            if (visible) found.forEach(name => { overrides[name] = userScale; });
+        });
+
+        resetBtn.addEventListener('click', () => {
+            userScale = 1.0;
+            sl.value = 100;
+            valSpan.textContent = '100%';
+            found.forEach(name => { delete overrides[name]; });
+            if (!visible) {
+                visible = true;
+                eyeBtn.classList.remove('off');
+                if (side === 'outfit') {
+                    const bodyUniform = getOutfitGroupBodyUniform(grp);
+                    if (bodyUniform) setBodyZone(bodyUniform, false); // outfit redevient visible → corps caché
+                    if (syncOutfitToCorps) _groupEyeRegistry[grp.label]?.body?.(false, false); // corps → off (bones + UI)
+                } else {
+                    // Corps reset → visible : outfit disparaît seulement si sync active (pas Tête/Cou)
+                    if (syncOutfitToCorps) _groupEyeRegistry[grp.label]?.outfit?.(false, false);
+                    const bodyUniform = getOutfitGroupBodyUniform(grp);
+                    if (bodyUniform) setBodyZone(bodyUniform, true);
+                }
+            }
+        });
+
+        eyeBtn.addEventListener('click', () => {
+            visible = !visible;
+            eyeBtn.classList.toggle('off', !visible);
+
+            if (side === 'outfit') {
+                // Outfit : squish des bones outfit + body zone shader
+                found.forEach(name => { overrides[name] = visible ? userScale : 0.001; });
+                const bodyUniform = getOutfitGroupBodyUniform(grp);
+                if (bodyUniform) setBodyZone(bodyUniform, !visible); // outfit caché → corps visible
+                if (syncOutfitToCorps) _groupEyeRegistry[grp.label]?.body?.(!visible, false);
+            } else {
+                // Corps : body zone shader (pas de squish des bones trunk → plus d'effondrement tête)
+                const bodyUniform = getOutfitGroupBodyUniform(grp);
+                if (bodyUniform) {
+                    setBodyZone(bodyUniform, visible);
+                    found.forEach(name => { overrides[name] = userScale; }); // maintient la proportion
+                } else {
+                    // Tête/Cou : pas d'uniform → bone squish (bones feuilles, sans enfants trunk)
+                    found.forEach(name => { overrides[name] = visible ? userScale : 0.001; });
+                }
+                // Sync vers outfit seulement si la logique est active (pas Tête/Cou)
+                if (syncOutfitToCorps) _groupEyeRegistry[grp.label]?.outfit?.(!visible, false);
+            }
+        });
+
+        row.appendChild(top); row.appendChild(sl); container.appendChild(row);
+    }
+}
+
+function buildMeshSliders() {
+    document.getElementById('proportions-section').style.display = '';
+    // Ouvrir le panneau au premier chargement (l'utilisateur peut le refermer ensuite)
+    const pb = document.getElementById('proportions-body');
+    const pt = document.getElementById('proportions-toggle');
+    if (pb.style.display === 'none') {
+        pb.style.display = '';
+        pt.classList.add('open');
+    }
+    // Vider le registry avant de reconstruire (évite les références périmées)
+    for (const k of Object.keys(_groupEyeRegistry)) delete _groupEyeRegistry[k];
+    makeBoneSliders('mesh-sliders-body',   liveBoneMap_body,   boneScaleOverrides_body);
+    makeBoneSliders('mesh-sliders-outfit', liveBoneMap_outfit, boneScaleOverrides_outfit);
+    // Sync initiale 1 : outfit visible → corps OFF (body zone shader 0 + UI) sauf Tête/Cou
+    for (const label of Object.keys(_groupEyeRegistry)) {
+        if (label === 'Tête' || label === 'Cou') continue;
+        const reg = _groupEyeRegistry[label];
+        if (reg.outfit && reg.body) {
+            reg.body(false, false); // full : bones 0.001 + UI off
+        }
+    }
+    // Tête/Cou : pas de sync croisée — corps et outfit indépendants (les deux peuvent être ON)
+}
+
+// ── Toggle proportions (collapsible) ─────────────────────────
+document.getElementById('proportions-toggle').addEventListener('click', () => {
+    const body    = document.getElementById('proportions-body');
+    const toggle  = document.getElementById('proportions-toggle');
+    const isOpen  = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    toggle.classList.toggle('open', !isOpen);
+});
+
+// ── Reset global de toutes les proportions ────────────────────
+document.getElementById('proportions-reset-btn').addEventListener('click', () => {
+    Object.keys(boneScaleOverrides_body).forEach(k => delete boneScaleOverrides_body[k]);
+    Object.keys(boneScaleOverrides_outfit).forEach(k => delete boneScaleOverrides_outfit[k]);
+    // Remettre toutes les zones corps à caché (outfit visible = corps caché)
+    _ALL_BODY_ZONES.forEach(u => setBodyZone(u, false));
+    // Reconstruire les sliders (reset visuel à 100%)
+    buildMeshSliders();
+    buildVisibilityToggles();
+    // Garder le panneau ouvert s'il l'était
+    const body = document.getElementById('proportions-body');
+    const toggle = document.getElementById('proportions-toggle');
+    if (body.style.display !== 'none') {
+        toggle.classList.add('open');
+    }
+});
+
+// ── Pastilles couleur cheveux ─────────────────────────────────
+const colorGrid   = document.getElementById('hair-colors');
+const customPicker = document.getElementById('hair-color-custom');
+
+HAIR_PRESETS.forEach((hex, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'cswatch' + (i === 2 ? ' active' : '');
+    sw.style.background = hex;
+    sw.title = hex;
+    sw.addEventListener('click', () => {
+        document.querySelectorAll('#hair-colors .cswatch').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        customPicker.value = hex;
+        hairColor.set(hex);
+        applyHairColor(hairColor);
+    });
+    colorGrid.appendChild(sw);
+});
+
+customPicker.addEventListener('input', e => {
+    document.querySelectorAll('#hair-colors .cswatch').forEach(s => s.classList.remove('active'));
+    hairColor.set(e.target.value);
+    applyHairColor(hairColor);
+});
+
+// ── Pastilles couleur yeux ────────────────────────────────────
+const EYE_PRESETS = [
+    '#3a7ab5','#4a9464','#7a5c3a','#8a8a8a',
+    '#d4a040','#1a1a2e','#c84040','#9040c0',
+];
+const eyeGrid     = document.getElementById('eye-colors');
+const eyePicker   = document.getElementById('eye-color-custom');
+
+EYE_PRESETS.forEach((hex, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'cswatch' + (i === 0 ? ' active' : '');
+    sw.style.background = hex;
+    sw.title = hex;
+    sw.addEventListener('click', () => {
+        document.querySelectorAll('#eye-colors .cswatch').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        eyePicker.value = hex;
+        eyeColor.set(hex);
+        applyEyeColor(eyeColor);
+    });
+    eyeGrid.appendChild(sw);
+});
+
+eyePicker.addEventListener('input', e => {
+    document.querySelectorAll('#eye-colors .cswatch').forEach(s => s.classList.remove('active'));
+    eyeColor.set(e.target.value);
+    applyEyeColor(eyeColor);
+});
+
+// ── Pastilles couleur peau ────────────────────────────────────
+// Teintes de peau calibrées : la formule lum/sLum les affiche fidèlement au milieu de gamme
+const SKIN_PRESETS = [
+    null,       // Naturel — texture originale (pas de shader override)
+    '#ffe4c4',  // Albâtre
+    '#f4c49a',  // Clair
+    '#d4956a',  // Médium
+    '#a0622a',  // Bronzé
+    '#6b3820',  // Brun
+    '#2e150a',  // Ébène
+];
+const SKIN_LABELS = ['Nat.','Albâtre','Clair','Médium','Bronzé','Brun','Ébène'];
+
+const skinGrid   = document.getElementById('skin-colors');
+const skinPicker = document.getElementById('skin-color-custom');
+
+SKIN_PRESETS.forEach((hex, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'cswatch' + (i === 0 ? ' active' : '');
+    sw.style.background = hex || '#888';
+    sw.title = SKIN_LABELS[i];
+    if (!hex) {
+        // Bouton "Naturel" : icône texture
+        sw.style.background = 'repeating-linear-gradient(45deg,#555 0,#555 3px,#333 3px,#333 6px)';
+        sw.style.fontSize = '8px';
+        sw.style.color = '#ccc';
+        sw.style.display = 'flex';
+        sw.style.alignItems = 'center';
+        sw.style.justifyContent = 'center';
+        sw.textContent = '○';
+    }
+    sw.addEventListener('click', () => {
+        document.querySelectorAll('#skin-colors .cswatch').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        if (hex) {
+            skinPicker.value = hex;
+            skinColor.set(hex);
+            skinColorActive = true;
+        } else {
+            skinColorActive = false; // texture naturelle
+        }
+        applySkinColor();
+    });
+    skinGrid.appendChild(sw);
+});
+
+skinPicker.addEventListener('input', e => {
+    document.querySelectorAll('#skin-colors .cswatch').forEach(s => s.classList.remove('active'));
+    skinColor.set(e.target.value);
+    skinColorActive = true;
+    applySkinColor();
+});
+
+// ── Scales os isolés ─────────────────────────────────────────
+// traverse() visite en depth-first (parent avant enfant) — ordre critique
+// Pour chaque bone scalé : on scale le bone ET on contre-ajuste la position
+// locale de ses enfants directs pour annuler le déplacement hérité.
+function applyIsolatedScales(root, overrides, restPos) {
+    if (!root) return;
+    // Passe 1 — reset tous les bones à leur état de repos
+    root.traverse(n => {
+        if (!n.isBone) return;
+        n.scale.set(1, 1, 1);
+        const rp = restPos[n.name];
+        if (rp) n.position.copy(rp);
+    });
+    if (!Object.keys(overrides).length) return;
+    // Passe 2 — appliquer overrides; counter-scaler les bones sans override
+    // pour que leur worldScale reste 1.0 malgré les scales ancestraux.
+    // wsMap = 1 pour les bones cachés (s < 0.01) : brise la cascade → évite 1/1e-9 → explosion.
+    const wsMap = {};
+    root.traverse(node => {
+        if (!node.isBone) return;
+        const pWS = (node.parent && node.parent.isBone) ? (wsMap[node.parent.name] ?? 1) : 1;
+        const s = overrides[node.name];
+        if (pWS !== 1) {
+            const rp = restPos[node.name];
+            if (rp) node.position.copy(rp).multiplyScalar(1 / pWS);
+        }
+        if (s !== undefined) {
+            node.scale.setScalar(s);
+            wsMap[node.name] = (s < 0.01) ? 1 : pWS * s;
+        } else if (pWS !== 1) {
+            node.scale.setScalar(1 / pWS);
+            wsMap[node.name] = 1;
+        } else {
+            wsMap[node.name] = 1;
+        }
+    });
+}
+
+// ── Système multi-config ──────────────────────────────────────
+function getCurrentConfig() {
+    return {
+        body:            state.body,
+        outfit:          state.outfit,
+        texVariant:      state.texVariant,
+        hair:            state.hair,
+        beard:           state.beard,
+        hairColor:       '#' + hairColor.getHexString(),
+        eyeColor:        '#' + eyeColor.getHexString(),
+        skinColor:       skinColorActive ? '#' + skinColor.getHexString() : null,
+        boneScaleBody:   { ...boneScaleOverrides_body },
+        boneScaleOutfit: { ...boneScaleOverrides_outfit },
+    };
+}
+
+function getSavedConfigs() {
+    try { return JSON.parse(localStorage.getItem('darkrpg_configs_v1') || '[]'); } catch { return []; }
+}
+
+function persistConfigs(list) {
+    localStorage.setItem('darkrpg_configs_v1', JSON.stringify(list));
+}
+
+let _activeConfigName = null; // nom de la config actuellement chargée
+
+function saveCurrentConfig(name) {
+    const list = getSavedConfigs();
+    const idx = list.findIndex(c => c.name === name);
+    const cfg = { name, ...getCurrentConfig() };
+    if (idx >= 0) list[idx] = cfg; else list.push(cfg);
+    persistConfigs(list);
+    _activeConfigName = name;
+    renderConfigList();
+}
+
+function loadConfig(cfg) {
+    state.body       = cfg.body       || 'M';
+    state.outfit     = cfg.outfit     || '';
+    state.texVariant = cfg.texVariant || 1;
+    state.hair       = cfg.hair       || '';
+    state.beard      = cfg.beard      || '';
+    if (cfg.hairColor) hairColor.set(cfg.hairColor);
+    if (cfg.eyeColor) {
+        eyeColor.set(cfg.eyeColor);
+        document.getElementById('eye-color-custom').value = cfg.eyeColor;
+        document.querySelectorAll('#eye-colors .cswatch').forEach(s => s.classList.remove('active'));
+    }
+    // Peau
+    document.querySelectorAll('#skin-colors .cswatch').forEach(s => s.classList.remove('active'));
+    if (cfg.skinColor) {
+        skinColor.set(cfg.skinColor);
+        skinColorActive = true;
+        document.getElementById('skin-color-custom').value = cfg.skinColor;
+    } else {
+        skinColorActive = false;
+        document.querySelector('#skin-colors .cswatch')?.classList.add('active'); // swatch "Naturel"
+    }
+    setActive('#body-btns .opt-btn',   'body',   state.body);
+    setActive('#outfit-btns .opt-btn', 'outfit', state.outfit);
+    setActive('#hair-btns .opt-btn',   'hair',   state.hair);
+    setActive('#beard-btns .opt-btn',  'beard',  state.beard);
+    document.querySelectorAll('#tex-btns .opt-btn').forEach(b =>
+        b.classList.toggle('active', parseInt(b.dataset.tex) === state.texVariant));
+    _pendingBoneScales = { body: cfg.boneScaleBody || {}, outfit: cfg.boneScaleOutfit || {} };
+    _activeConfigName = cfg.name;
+    // Pré-remplir le champ nom → le bouton "Sauvegarder" écrasera automatiquement
+    document.getElementById('config-name-input').value = cfg.name;
+    rebuild();
+}
+
+function exportConfigToGame(cfg) {
+    const gameConfig = { ...cfg };
+    delete gameConfig.name;
+    localStorage.setItem('darkrpg_character_v1', JSON.stringify(gameConfig));
+    const toast = document.getElementById('export-toast');
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+}
+
+function deleteConfig(name) {
+    if (_activeConfigName === name) _activeConfigName = null;
+    persistConfigs(getSavedConfigs().filter(c => c.name !== name));
+    renderConfigList();
+}
+
+function renderConfigList() {
+    const list = getSavedConfigs();
+    const el = document.getElementById('config-list');
+    el.innerHTML = '';
+    if (!list.length) {
+        el.innerHTML = '<div style="font-size:9px;opacity:.3;letter-spacing:2px;padding:4px 0;">Aucune config sauvegardée</div>';
+        return;
+    }
+    list.forEach(cfg => {
+        const row = document.createElement('div');
+        row.className = 'config-item' + (cfg.name === _activeConfigName ? ' active-config' : '');
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'config-item-name';
+        nameEl.textContent = cfg.name;
+        nameEl.title = 'Charger "' + cfg.name + '"';
+        nameEl.addEventListener('click', () => loadConfig(cfg));
+
+        const saveBtn = document.createElement('div');
+        saveBtn.className = 'config-action save';
+        saveBtn.textContent = '💾';
+        saveBtn.title = 'Écraser avec la config actuelle';
+        saveBtn.addEventListener('click', () => {
+            saveCurrentConfig(cfg.name);
+            saveBtn.textContent = '✓';
+            setTimeout(() => { saveBtn.textContent = '💾'; }, 1200);
+        });
+
+        const exportBtn = document.createElement('div');
+        exportBtn.className = 'config-action export';
+        exportBtn.textContent = '→ Jeu';
+        exportBtn.title = 'Exporter vers le jeu';
+        exportBtn.addEventListener('click', () => exportConfigToGame(cfg));
+
+        const delBtn = document.createElement('div');
+        delBtn.className = 'config-action del';
+        delBtn.textContent = '✕';
+        delBtn.title = 'Supprimer';
+        delBtn.addEventListener('click', () => deleteConfig(cfg.name));
+
+        row.appendChild(nameEl);
+        row.appendChild(saveBtn);
+        row.appendChild(exportBtn);
+        row.appendChild(delBtn);
+        el.appendChild(row);
+    });
+}
+
+document.getElementById('config-save-btn').addEventListener('click', () => {
+    const input = document.getElementById('config-name-input');
+    const name = input.value.trim();
+    if (!name) {
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 800);
+        return;
+    }
+    saveCurrentConfig(name);
+    const btn = document.getElementById('config-save-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'Sauvegardé ✓';
+    btn.style.color = 'rgba(160,220,130,0.75)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+});
+
+// ── Init ──────────────────────────────────────────────────────
+rebuild();
+loadUAL(2);
+renderConfigList();
+
+// ── Boucle ────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+(function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (mixerOutfit) mixerOutfit.update(delta);
+    if (mixerBody)   mixerBody.update(delta);
+    // Réappliquer les scales custom APRÈS les mixers, avec contre-ajustement des enfants
+    applyIsolatedScales(outfitRoot, boneScaleOverrides_outfit, boneRestPos_outfit);
+    applyIsolatedScales(bodyRoot,   boneScaleOverrides_body,   boneRestPos_body);
+    controls.update();
+    renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+    camera.aspect = vp.clientWidth/vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth, vp.clientHeight);
+});
+</script>
+</body>
+</html>

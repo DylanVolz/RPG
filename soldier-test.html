@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Soldier — Test animations</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111418; overflow:hidden; font-family:'Georgia', serif; }
+canvas { display:block; }
+
+#ui {
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px;
+}
+.anim-btn {
+    background:rgba(0,0,0,0.6);
+    border:1px solid rgba(200,184,154,0.35);
+    color:#c8b89a; padding:10px 22px;
+    font-family:'Georgia', serif; font-size:12px;
+    letter-spacing:2px; cursor:pointer;
+    transition:background 0.15s, border-color 0.15s;
+    text-transform:uppercase;
+}
+.anim-btn:hover  { background:rgba(200,184,154,0.12); border-color:#c8b89a; }
+.anim-btn.active { background:rgba(200,184,154,0.18); border-color:#c8b89a; color:#fff; }
+
+#status {
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.5); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase;
+}
+
+#clip-list {
+    position:fixed; top:20px; right:20px;
+    color:rgba(200,184,154,0.4); font-size:10px;
+    letter-spacing:1px; line-height:2;
+    text-align:right;
+}
+#clip-list span { display:block; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="status">Chargement...</div>
+<div id="clip-list"></div>
+
+<div id="ui">
+    <button class="anim-btn active" data-anim="Idle">Idle</button>
+    <button class="anim-btn"        data-anim="Walk">Walk</button>
+    <button class="anim-btn"        data-anim="Run">Run</button>
+    <button class="anim-btn"        data-anim="TPose">T-Pose</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }      from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
+
+// ── Scène ────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111418);
+scene.fog = new THREE.Fog(0x111418, 12, 30);
+
+// ── Caméra ───────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 1.4, 4.5);
+
+// ── Renderer ─────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+// ── OrbitControls (clic droit = orbite) ─────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.5;
+controls.maxDistance = 10;
+controls.update();
+
+// ── Lumières ─────────────────────────────────────────────────────
+const hemi = new THREE.HemisphereLight(0xffd8a0, 0x302010, 1.2);
+scene.add(hemi);
+
+const dir = new THREE.DirectionalLight(0xfff0d0, 2.5);
+dir.position.set(4, 8, 5);
+dir.castShadow = true;
+dir.shadow.mapSize.set(1024, 1024);
+dir.shadow.camera.near = 0.5;
+dir.shadow.camera.far = 25;
+scene.add(dir);
+
+const fill = new THREE.DirectionalLight(0x6080a0, 0.6);
+fill.position.set(-4, 3, -4);
+scene.add(fill);
+
+// ── Sol ──────────────────────────────────────────────────────────
+const floorMat = new THREE.MeshStandardMaterial({
+    color: 0x2a2218,
+    roughness: 0.95,
+    metalness: 0.0,
+});
+const floor = new THREE.Mesh(new THREE.CircleGeometry(6, 48), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Cercle décoratif
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.8, 1.85, 64),
+    new THREE.MeshBasicMaterial({ color: 0x4a3820, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.001;
+scene.add(ring);
+
+// ── AnimationMixer ───────────────────────────────────────────────
+let mixer   = null;
+let actions = {};
+let active  = null;
+
+function playAnim(name, crossfade = 0.2) {
+    const next = actions[name];
+    if (!next || next === active) return;
+
+    if (active) active.fadeOut(crossfade);
+    next.reset().fadeIn(crossfade).play();
+    active = next;
+
+    // Bouton actif
+    document.querySelectorAll('.anim-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.anim === name);
+    });
+    document.getElementById('status').textContent = '▶  ' + name;
+}
+
+// ── Chargement Soldier.glb ───────────────────────────────────────
+const loader = new GLTFLoader();
+loader.load(
+    'https://threejs.org/examples/models/gltf/Soldier.glb',
+    (gltf) => {
+        const model = gltf.scene;
+        model.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow    = true;
+                child.receiveShadow = true;
+            }
+        });
+        scene.add(model);
+
+        // AnimationMixer
+        mixer = new THREE.AnimationMixer(model);
+
+        // Enregistrer tous les clips
+        const clipNames = [];
+        for (const clip of gltf.animations) {
+            actions[clip.name] = mixer.clipAction(clip);
+            clipNames.push(clip.name);
+        }
+
+        // Afficher les clips détectés
+        const listEl = document.getElementById('clip-list');
+        listEl.innerHTML = '<span style="color:rgba(200,184,154,0.25);margin-bottom:4px">CLIPS DÉTECTÉS</span>'
+            + clipNames.map(n => `<span>${n}</span>`).join('');
+
+        // Jouer Idle par défaut
+        playAnim('Idle', 0);
+    },
+    (xhr) => {
+        const pct = Math.round(xhr.loaded / xhr.total * 100);
+        document.getElementById('status').textContent = 'Chargement... ' + pct + '%';
+    },
+    (err) => {
+        document.getElementById('status').textContent = 'Erreur : ' + err.message;
+        console.error(err);
+    }
+);
+
+// ── Boutons UI ───────────────────────────────────────────────────
+document.querySelectorAll('.anim-btn').forEach(btn => {
+    btn.addEventListener('click', () => playAnim(btn.dataset.anim));
+});
+
+// ── Boucle ───────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (mixer) mixer.update(delta);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+// ── Resize ───────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

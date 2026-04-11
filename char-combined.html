@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Character + Animation Combiner</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+/* ── Sidebar ── */
+#sidebar {
+    width:260px; flex-shrink:0; background:#0a0c0e;
+    border-right:1px solid rgba(200,184,154,0.1);
+    display:flex; flex-direction:column; overflow:hidden;
+}
+.section-title {
+    padding:10px 14px 6px; font-size:9px; letter-spacing:3px;
+    text-transform:uppercase; color:rgba(200,184,154,0.35);
+    border-bottom:1px solid rgba(200,184,154,0.08);
+}
+.btn-group { display:flex; flex-wrap:wrap; gap:4px; padding:8px; border-bottom:1px solid rgba(200,184,154,0.08); }
+.sel-btn {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); padding:5px 10px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s; text-transform:uppercase; flex:1;
+}
+.sel-btn:hover, .sel-btn.active {
+    background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4);
+}
+#clip-list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.clip-item {
+    padding:7px 14px; font-size:10px; letter-spacing:0.5px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; display:flex; justify-content:space-between; align-items:center;
+}
+.clip-item:hover  { background:rgba(200,184,154,0.08); }
+.clip-item.active { background:rgba(200,184,154,0.15); color:#fff; }
+.clip-item .dur   { font-size:9px; opacity:0.35; }
+#status-bar {
+    padding:10px 14px; font-size:9px; letter-spacing:2px;
+    color:rgba(200,184,154,0.3); border-top:1px solid rgba(200,184,154,0.08);
+    line-height:1.8;
+}
+
+/* ── Viewport ── */
+#viewport { flex:1; position:relative; }
+#viewport canvas { display:block; width:100% !important; height:100% !important; }
+#label {
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.45); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; pointer-events:none; text-align:center; line-height:1.8;
+}
+#hint {
+    position:absolute; bottom:16px; right:16px;
+    color:rgba(200,184,154,0.2); font-size:9px; letter-spacing:1px;
+    line-height:2; text-align:right; pointer-events:none;
+}
+#clip-search {
+    background:rgba(200,184,154,0.06); border:none;
+    border-bottom:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:10px 14px; font-family:'Georgia',serif;
+    font-size:10px; letter-spacing:1px; outline:none; width:100%;
+}
+#clip-search::placeholder { color:rgba(200,184,154,0.2); }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="sidebar">
+    <!-- Outfit -->
+    <div class="section-title">Personnage</div>
+    <div class="btn-group" id="outfit-btns">
+        <div class="sel-btn active" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf">♂ Ranger</div>
+        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Peasant.gltf">♂ Peasant</div>
+        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Ranger.gltf">♀ Ranger</div>
+        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf">♀ Peasant</div>
+    </div>
+
+    <!-- Librairie d'animation -->
+    <div class="section-title">Librairie d'animation</div>
+    <div class="btn-group" id="ual-btns">
+        <div class="sel-btn" data-lib="1">UAL 1</div>
+        <div class="sel-btn active" data-lib="2">UAL 2</div>
+    </div>
+
+    <!-- Recherche + liste clips -->
+    <input id="clip-search" type="text" placeholder="Filtrer les clips...">
+    <div id="clip-list"></div>
+    <div id="status-bar">—</div>
+</div>
+
+<div id="viewport">
+    <div id="label">—</div>
+    <div id="hint">Clic droit : orbiter<br>Molette : zoom</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// ── Scène ─────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111418);
+scene.fog = new THREE.Fog(0x111418, 15, 40);
+
+const vp = document.getElementById('viewport');
+const camera = new THREE.PerspectiveCamera(50, vp.clientWidth / vp.clientHeight, 0.05, 100);
+camera.position.set(0, 1.5, 3.8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(vp.clientWidth, vp.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+vp.appendChild(renderer.domElement);
+
+const ctrl = new OrbitControls(camera, renderer.domElement);
+ctrl.target.set(0, 0.9, 0);
+ctrl.enableDamping = true;
+ctrl.dampingFactor = 0.08;
+ctrl.minDistance = 0.8;
+ctrl.maxDistance = 10;
+ctrl.update();
+
+scene.add(new THREE.AmbientLight(0xffd8a0, 0.7));
+const sun = new THREE.DirectionalLight(0xfff4d0, 3.0);
+sun.position.set(4, 7, 4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+const fillLight = new THREE.DirectionalLight(0x8090b0, 0.8);
+fillLight.position.set(-3, 2, -3);
+scene.add(fillLight);
+const rimLight = new THREE.DirectionalLight(0xffaa44, 1.0);
+rimLight.position.set(0, 3, -5);
+scene.add(rimLight);
+
+const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(6, 48),
+    new THREE.MeshStandardMaterial({ color: 0x1a1612, roughness: 0.95 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.9, 0.96, 64),
+    new THREE.MeshBasicMaterial({ color: 0x3a2e1a, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.002;
+scene.add(ring);
+
+// ── État ──────────────────────────────────────────────────────────
+const loader = new GLTFLoader();
+let outfitGltf = null, ualGltf = null;
+let currentModel = null, mixer = null, activeAction = null;
+let allClips = [], filterTerm = '';
+
+const UAL_PATHS = {
+    1: 'Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb',
+    2: 'Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb',
+};
+
+let currentOutfitSrc = document.querySelector('#outfit-btns .sel-btn').dataset.src;
+let currentUAL = 2;
+
+// ── Combinaison outfit + animations ──────────────────────────────
+function rebuildScene() {
+    if (!outfitGltf || !ualGltf) return;
+
+    if (activeAction) { activeAction.stop(); activeAction = null; }
+    if (mixer)        { mixer.stopAllAction(); mixer = null; }
+    if (currentModel) { scene.remove(currentModel); currentModel = null; }
+
+    const model = SkeletonUtils.clone(outfitGltf.scene);
+
+    // Calibrer à 1.75m
+    const box = new THREE.Box3().setFromObject(model);
+    const h   = box.max.y - box.min.y;
+    model.scale.setScalar(1.75 / h);
+    box.setFromObject(model);
+    model.position.y = -box.min.y;
+
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+    scene.add(model);
+    currentModel = model;
+
+    mixer = new THREE.AnimationMixer(model);
+
+    // Retarget les clips UAL sur le squelette du outfit
+    allClips = ualGltf.animations.map(clip =>
+        THREE.AnimationClip.parse(THREE.AnimationClip.toJSON(clip))
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    setStatus('Prêt — ' + allClips.length + ' clips');
+    renderClipList();
+
+    // Jouer idle en premier
+    const idleClip = allClips.find(c => c.name.toLowerCase().includes('idle')) || allClips[0];
+    if (idleClip) playClip(idleClip);
+}
+
+function playClip(clip) {
+    if (!mixer) return;
+    if (activeAction) activeAction.fadeOut(0.2);
+    const action = mixer.clipAction(clip);
+    action.reset().fadeIn(0.2).play();
+    activeAction = action;
+    document.getElementById('label').textContent =
+        (currentOutfitSrc.split('/').pop().replace('.gltf','')) + '\n' + clip.name;
+}
+
+// ── Liste clips ───────────────────────────────────────────────────
+function renderClipList() {
+    const term = filterTerm.toLowerCase();
+    const visible = allClips.filter(c => !term || c.name.toLowerCase().includes(term));
+    const listEl = document.getElementById('clip-list');
+    listEl.innerHTML = '';
+    for (const clip of visible) {
+        const el = document.createElement('div');
+        el.className = 'clip-item';
+        el.dataset.name = clip.name;
+        el.innerHTML = `<span>${clip.name}</span><span class="dur">${clip.duration.toFixed(2)}s</span>`;
+        el.addEventListener('click', () => {
+            document.querySelectorAll('.clip-item').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            playClip(clip);
+        });
+        listEl.appendChild(el);
+    }
+}
+
+document.getElementById('clip-search').addEventListener('input', e => {
+    filterTerm = e.target.value;
+    renderClipList();
+});
+
+// ── Chargement outfit ─────────────────────────────────────────────
+function loadOutfit(src) {
+    setStatus('Chargement outfit...');
+    loader.load(src, gltf => {
+        outfitGltf = gltf;
+        setStatus('Outfit OK — ' + (ualGltf ? 'combo...' : 'attente UAL'));
+        rebuildScene();
+    }, undefined, err => setStatus('⚠ Outfit : ' + err.message));
+}
+
+// ── Chargement UAL ────────────────────────────────────────────────
+function loadUAL(n) {
+    setStatus('Chargement UAL' + n + '...');
+    loader.load(UAL_PATHS[n], gltf => {
+        ualGltf = gltf;
+        setStatus('UAL' + n + ' OK — ' + gltf.animations.length + ' clips' + (outfitGltf ? ' — combo...' : ' — attente outfit'));
+        rebuildScene();
+    }, undefined, err => setStatus('⚠ UAL : ' + err.message));
+}
+
+// ── Boutons outfit ────────────────────────────────────────────────
+document.querySelectorAll('#outfit-btns .sel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#outfit-btns .sel-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentOutfitSrc = btn.dataset.src;
+        outfitGltf = null;
+        loadOutfit(currentOutfitSrc);
+    });
+});
+
+// ── Boutons UAL ───────────────────────────────────────────────────
+document.querySelectorAll('#ual-btns .sel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#ual-btns .sel-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentUAL = parseInt(btn.dataset.lib);
+        ualGltf = null;
+        loadUAL(currentUAL);
+    });
+});
+
+function setStatus(msg) { document.getElementById('status-bar').textContent = msg; }
+
+// ── Démarrage ─────────────────────────────────────────────────────
+loadOutfit(currentOutfitSrc);
+loadUAL(currentUAL);
+
+// ── Boucle ────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+(function animate() {
+    requestAnimationFrame(animate);
+    if (mixer) mixer.update(clock.getDelta());
+    ctrl.update();
+    renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+    camera.aspect = vp.clientWidth / vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth, vp.clientHeight);
+});
+</script>
+</body>
+</html>

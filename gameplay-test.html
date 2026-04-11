@@ -1,0 +1,3102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Gameplay Test — Dark RPG</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Georgia',serif; color:#c8b89a; }
+canvas { display:block; width:100vw; height:100vh; }
+
+/* ── HUD ── */
+#hud { position:fixed; inset:0; pointer-events:none; }
+
+#state-dbg {
+    position:absolute; top:12px; left:12px;
+    background:rgba(0,0,0,0.65); border:1px solid rgba(200,184,154,0.15);
+    padding:8px 12px; font-size:11px; line-height:1.7;
+    min-width:200px; letter-spacing:0.5px;
+}
+#state-dbg .lbl { color:rgba(200,184,154,0.4); font-size:9px; letter-spacing:3px; text-transform:uppercase; }
+#state-dbg .val { color:#e8d8b4; }
+#state-dbg .anim-name { color:#d4a84b; font-size:12px; font-weight:bold; }
+
+#stamina-wrap {
+    position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
+    width:260px; text-align:center;
+}
+#stamina-label { font-size:8px; letter-spacing:3px; text-transform:uppercase; color:rgba(200,184,154,0.35); margin-bottom:4px; }
+#stamina-bar-bg { background:rgba(255,255,255,0.07); border:1px solid rgba(200,184,154,0.15); height:4px; border-radius:2px; }
+#stamina-bar { height:100%; background:#c8a050; border-radius:2px; transition:width 0.1s; width:100%; }
+
+#crosshair {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    display:none; pointer-events:none;
+}
+#crosshair::before, #crosshair::after {
+    content:''; position:absolute; background:rgba(255,255,255,0.8);
+}
+#crosshair::before { width:1px; height:14px; left:0; top:-7px; }
+#crosshair::after  { width:14px; height:1px; left:-7px; top:0; }
+
+/* ── Key legend ── */
+#key-legend {
+    position:absolute; top:12px; right:12px;
+    background:rgba(0,0,0,0.65); border:1px solid rgba(200,184,154,0.15);
+    padding:8px 12px; font-size:9px; line-height:1.9;
+    max-width:220px; letter-spacing:0.3px;
+}
+#key-legend .ktitle { font-size:8px; letter-spacing:3px; text-transform:uppercase; color:rgba(200,184,154,0.3); margin-bottom:4px; }
+#key-legend .krow { display:flex; gap:6px; }
+#key-legend .kkey { color:#d4a84b; min-width:68px; flex-shrink:0; }
+#key-legend .kdesc { color:rgba(200,184,154,0.55); }
+#key-legend .ksep { border-top:1px solid rgba(200,184,154,0.08); margin:4px 0; }
+#legend-toggle { position:absolute; top:12px; right:12px; pointer-events:all;
+    background:rgba(0,0,0,0.65); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); font-size:9px; letter-spacing:2px;
+    padding:5px 10px; cursor:pointer; display:none; }
+
+/* ── Mode badge ── */
+#mode-badge {
+    position:absolute; bottom:28px; right:16px;
+    font-size:9px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3); text-align:right; line-height:2;
+}
+#combat-mode { color:#d4a84b; font-size:11px; letter-spacing:2px; }
+
+/* ── Kick button ── */
+#kick-btn {
+    position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
+    font-size:9px; letter-spacing:3px; text-transform:uppercase;
+    background:rgba(0,0,0,0.65); border:1px solid rgba(200,184,154,0.2);
+    color:rgba(200,184,154,0.55); padding:5px 14px; cursor:pointer;
+    pointer-events:all; transition:all 0.12s; user-select:none;
+}
+#kick-btn:hover { background:rgba(200,184,154,0.1); color:#d4a84b; border-color:rgba(212,168,75,0.4); }
+#kick-btn.cooldown { opacity:0.3; cursor:default; }
+
+/* ── Emote wheel ── */
+#emote-wheel {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    display:none; pointer-events:none;
+}
+.emote-ring {
+    position:relative; width:260px; height:260px;
+}
+.emote-slot {
+    position:absolute; width:52px; height:52px;
+    background:rgba(8,10,12,0.9); border:1px solid rgba(200,184,154,0.2);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; transition:all 0.1s; user-select:none; pointer-events:all;
+    border-radius:4px;
+}
+.emote-slot:hover, .emote-slot.hovered {
+    background:rgba(200,184,154,0.15); border-color:rgba(200,184,154,0.6);
+}
+.emote-slot .eicon { font-size:18px; line-height:1; }
+.emote-slot .ename { font-size:7px; letter-spacing:1px; text-transform:uppercase;
+    color:rgba(200,184,154,0.5); margin-top:2px; text-align:center; }
+#emote-center {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:50px; height:50px; background:rgba(0,0,0,0.8);
+    border:1px solid rgba(200,184,154,0.15); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:8px; letter-spacing:2px; color:rgba(200,184,154,0.3); text-transform:uppercase;
+}
+
+/* ── Notifications ── */
+#notif {
+    position:absolute; bottom:80px; left:50%; transform:translateX(-50%);
+    font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    color:rgba(200,184,154,0.7); text-align:center;
+    pointer-events:none; opacity:0; transition:opacity 0.3s;
+}
+
+/* ── Loading overlay ── */
+#loading {
+    position:fixed; inset:0; background:#0d0f12;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:100;
+}
+#loading h1 { font-size:14px; letter-spacing:6px; text-transform:uppercase; color:rgba(200,184,154,0.6); margin-bottom:20px; }
+#loading-bar-bg { width:280px; height:2px; background:rgba(200,184,154,0.1); }
+#loading-bar { height:100%; background:#c8a050; width:0%; transition:width 0.3s; }
+#loading-sub { font-size:9px; letter-spacing:3px; color:rgba(200,184,154,0.25); margin-top:12px; text-transform:uppercase; }
+
+/* ── Climb prompt ── */
+#climb-prompt {
+    position:absolute; bottom:120px; left:50%; transform:translateX(-50%);
+    font-size:9px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(200,184,154,0.5); background:rgba(0,0,0,0.5);
+    padding:5px 12px; border:1px solid rgba(200,184,154,0.1);
+    display:none; text-align:center;
+}
+
+/* ── Weapon panel ── */
+#weapon-panel {
+    position:absolute; bottom:60px; left:12px;
+    background:rgba(0,0,0,0.72); border:1px solid rgba(200,184,154,0.15);
+    padding:8px 10px; width:210px; pointer-events:all;
+}
+#weapon-panel .wp-title {
+    font-size:8px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3); margin-bottom:7px;
+}
+#weapon-panel .wp-slot { margin-bottom:8px; }
+#weapon-panel .wp-slot-label {
+    font-size:8px; letter-spacing:2px; text-transform:uppercase;
+    color:rgba(200,184,154,0.45); margin-bottom:4px;
+}
+#weapon-panel .wp-btns { display:flex; flex-wrap:wrap; gap:3px; }
+#weapon-panel .wp-btn {
+    font-size:8px; letter-spacing:0.5px; text-transform:uppercase;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(200,184,154,0.18);
+    color:rgba(200,184,154,0.5); padding:3px 6px; cursor:pointer;
+    border-radius:2px; transition:all 0.1s;
+}
+#weapon-panel .wp-btn:hover { background:rgba(200,184,154,0.1); color:#d4a84b; }
+#weapon-panel .wp-btn.active {
+    background:rgba(212,168,75,0.18); border-color:rgba(212,168,75,0.5); color:#d4a84b;
+}
+/* Grip tuning */
+#wp-grip {
+    border-top:1px solid rgba(200,184,154,0.08); margin-top:6px; padding-top:6px;
+    display:none;
+}
+#wp-grip .wg-title {
+    font-size:7px; letter-spacing:2px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3); margin-bottom:5px; display:flex;
+    justify-content:space-between; align-items:center;
+}
+#wp-grip .wg-log {
+    font-size:7px; cursor:pointer; color:rgba(212,168,75,0.6);
+    background:none; border:none; padding:0; letter-spacing:1px; text-transform:uppercase;
+}
+#wp-grip .wg-row {
+    display:flex; align-items:center; gap:4px; margin-bottom:3px;
+}
+#wp-grip .wg-lbl {
+    font-size:8px; color:rgba(200,184,154,0.4); min-width:36px;
+}
+#wp-grip .wg-val {
+    font-size:8px; color:#d4a84b; min-width:38px; text-align:right;
+}
+#wp-grip input[type=range] {
+    flex:1; height:2px; accent-color:#c8a050; cursor:pointer;
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="vp"></canvas>
+
+<div id="hud">
+  <div id="state-dbg">
+    <div class="lbl">État</div>
+    <div class="anim-name" id="dbg-anim">—</div>
+    <div class="lbl" style="margin-top:4px">Mode combat</div>
+    <div class="val" id="dbg-combat">Aucun</div>
+    <div class="lbl" style="margin-top:4px">Vitesse / Sol</div>
+    <div class="val" id="dbg-phys">—</div>
+    <div class="lbl" style="margin-top:4px">Position</div>
+    <div class="val" id="dbg-pos">—</div>
+  </div>
+
+  <div id="key-legend">
+    <div class="ktitle">Contrôles</div>
+    <div class="krow"><span class="kkey">W A S D</span><span class="kdesc">Déplacer</span></div>
+    <div class="krow"><span class="kkey">Shift</span><span class="kdesc">Sprint</span></div>
+    <div class="krow"><span class="kkey">Espace</span><span class="kdesc">Sauter</span></div>
+    <div class="krow"><span class="kkey">C</span><span class="kdesc">Accroupir</span></div>
+    <div class="krow"><span class="kkey">Caps Lock</span><span class="kdesc">Marche / Course</span></div>
+    <div class="krow"><span class="kkey">Ctrl</span><span class="kdesc">Ramper</span></div>
+    <div class="krow"><span class="kkey">F</span><span class="kdesc">Interagir / Grimper</span></div>
+    <div class="krow"><span class="kkey">R</span><span class="kdesc">Roulade</span></div>
+    <div class="krow"><span class="kkey">Q / E</span><span class="kdesc">Lean caméra G/D</span></div>
+    <div class="krow"><span class="kkey">Shift+Q/E</span><span class="kdesc">Esquive G/D</span></div>
+    <div class="ksep"></div>
+    <div class="krow"><span class="kkey">1</span><span class="kdesc">Mode épée</span></div>
+    <div class="krow"><span class="kkey">2</span><span class="kdesc">Mode poings</span></div>
+    <div class="krow"><span class="kkey">3</span><span class="kdesc">Mode magie</span></div>
+    <div class="krow"><span class="kkey">4</span><span class="kdesc">Mode arc</span></div>
+    <div class="krow"><span class="kkey">0</span><span class="kdesc">Désarmer</span></div>
+    <div class="krow"><span class="kkey">Clic G</span><span class="kdesc">Attaquer</span></div>
+    <div class="krow"><span class="kkey">K</span><span class="kdesc">Coup de pied</span></div>
+    <div class="krow"><span class="kkey">Clic D</span><span class="kdesc">Bloquer / Viser</span></div>
+    <div class="ksep"></div>
+    <div class="krow"><span class="kkey">G (tenir)</span><span class="kdesc">Roue émotes</span></div>
+    <div class="krow"><span class="kkey">Tab</span><span class="kdesc">Cursor lock</span></div>
+    <div class="krow"><span class="kkey">V</span><span class="kdesc">1re / 3e personne</span></div>
+    <div class="krow"><span class="kkey">Molette</span><span class="kdesc">Zoom caméra</span></div>
+    <div class="krow"><span class="kkey">Clic D drag</span><span class="kdesc">Orbite caméra</span></div>
+  </div>
+
+  <div id="stamina-wrap">
+    <div id="stamina-label">Endurance</div>
+    <div id="stamina-bar-bg"><div id="stamina-bar"></div></div>
+  </div>
+
+  <div id="mode-badge">
+    <div id="combat-mode">—</div>
+    <div id="cam-mode-lbl">3RD</div>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="climb-prompt">F / Espace — Grimper &nbsp;|&nbsp; (saut vers le mur = auto-grab)</div>
+  <div id="notif"></div>
+  <button id="kick-btn" onclick="doKick()">🦵 Coup de pied &nbsp;<span style="opacity:0.4;font-size:8px">[K]</span></button>
+
+  <div id="weapon-panel">
+    <div class="wp-title">Armes</div>
+    <div class="wp-slot">
+      <div class="wp-slot-label">Main droite</div>
+      <div class="wp-btns" id="wp-btns-R"></div>
+    </div>
+    <div class="wp-slot">
+      <div class="wp-slot-label">Main gauche</div>
+      <div class="wp-btns" id="wp-btns-L"></div>
+    </div>
+    <div id="wp-grip">
+      <div class="wg-title">
+        <span>Réglage grip</span>
+        <button class="wg-log" onclick="logGripOffsets()">💾 Sauvegarder</button>
+      </div>
+      <div class="wg-row"><span class="wg-lbl">Pos X</span><input type="range" id="wg-px" min="-0.3" max="0.3" step="0.005"><span class="wg-val" id="wg-px-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Pos Y</span><input type="range" id="wg-py" min="-0.3" max="0.3" step="0.005"><span class="wg-val" id="wg-py-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Pos Z</span><input type="range" id="wg-pz" min="-0.3" max="0.3" step="0.005"><span class="wg-val" id="wg-pz-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Rot X</span><input type="range" id="wg-rx" min="-3.15" max="3.15" step="0.05"><span class="wg-val" id="wg-rx-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Rot Y</span><input type="range" id="wg-ry" min="-3.15" max="3.15" step="0.05"><span class="wg-val" id="wg-ry-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Rot Z</span><input type="range" id="wg-rz" min="-3.15" max="3.15" step="0.05"><span class="wg-val" id="wg-rz-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Scale</span><input type="range" id="wg-sc" min="0.3" max="3.0" step="0.05"><span class="wg-val" id="wg-sc-v">1</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Emote wheel (outside hud for z-index) -->
+<div id="emote-wheel">
+  <div class="emote-ring" id="emote-ring">
+    <div id="emote-center">G</div>
+  </div>
+</div>
+
+<div id="loading">
+  <h1>Gameplay Test</h1>
+  <div id="loading-bar-bg"><div id="loading-bar"></div></div>
+  <div id="loading-sub">Chargement personnage…</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG — Chemins
+// ═══════════════════════════════════════════════════════════════
+const ANIM_SOURCES = [
+    'assets/characters/animations/UAL1_Source.glb',
+    'assets/characters/animations/UAL2_Standard.glb',
+    'assets/characters/animations/UAL2_Source.glb',
+];
+const P_OUTFIT = 'assets/characters/outfits/';
+const P_BODY   = { M:'assets/characters/bodies/Superhero_Male_FullBody.gltf',
+                   F:'assets/characters/bodies/Superhero_Female_FullBody.gltf' };
+const P_HAIR   = 'assets/characters/hair/';
+
+// ═══════════════════════════════════════════════════════════════
+//  CHAR CONFIG — lit depuis localStorage (même logique que char-config.js)
+// ═══════════════════════════════════════════════════════════════
+function resolveCharConfig() {
+    let c = null;
+    try { c = JSON.parse(localStorage.getItem('darkrpg_character_v1') || 'null'); } catch {}
+    const body   = c?.body   || 'M';
+    const outfit = (c?.outfit != null && c.outfit !== '') ? c.outfit : 'Male_Ranger';
+    return {
+        name        : c?.name || 'Joueur',
+        meshUrl     : P_OUTFIT + outfit + '.gltf',
+        baseUrl     : P_BODY[body] || P_BODY['M'],
+        hairUrl     : c?.hair  ? P_HAIR + c.hair  + '.gltf' : null,
+        beardUrl    : c?.beard ? P_HAIR + c.beard + '.gltf' : null,
+        hairColor   : c?.hairColor  || null,
+        eyeColor    : c?.eyeColor   || null,
+        skinColor   : c?.skinColor  || null,
+        boneScaleBody  : c?.boneScaleBody   || {},
+        boneScaleOutfit: c?.boneScaleOutfit || {},
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CLIP MAP — Toutes les animations disponibles
+// ═══════════════════════════════════════════════════════════════
+const CLIP_MAP = {
+    // Locomotion
+    idle:'Idle_Loop', idle_look:'Idle_LookAround_Loop', idle_tired:'Idle_Tired_Loop',
+    idle_torch:'Idle_Torch_Loop',
+    walk:'Walk_Loop', walk_formal:'Walk_Formal_Loop',
+    jog:'Jog_Fwd_Loop', jog_bwd:'Jog_Bwd_Loop',
+    jog_left:'Jog_Left_Loop', jog_right:'Jog_Right_Loop',
+    jog_leanL:'Jog_Fwd_LeanL_Loop', jog_leanR:'Jog_Fwd_LeanR_Loop',
+    sprint:'Sprint_Loop', sprint_enter:'Sprint_Enter', sprint_exit:'Sprint_Exit',
+    // Crouch
+    crouch_enter:'Crouch_Enter', crouch_exit:'Crouch_Exit',
+    crouch_idle:'Crouch_Idle_Loop', crouch_fwd:'Crouch_Fwd_Loop',
+    crouch_bwd:'Crouch_Bwd_Loop', crouch_left:'Crouch_Left_Loop', crouch_right:'Crouch_Right_Loop',
+    // Crawl
+    crawl_enter:'Crawl_Enter', crawl_exit:'Crawl_Exit',
+    crawl_idle:'Crawl_Idle_Loop', crawl_fwd:'Crawl_Fwd_Loop',
+    crawl_bwd:'Crawl_Bwd_Loop', crawl_left:'Crawl_Left_Loop', crawl_right:'Crawl_Right_Loop',
+    // Jump
+    jump_start:'Jump_Start', jump_loop:'Jump_Loop', jump_land:'Jump_Land',
+    ninja_jump:'NinjaJump_Start', ninja_idle:'NinjaJump_Idle_Loop', ninja_land:'NinjaJump_Land',
+    // Dodge / Roll
+    roll:'Roll', dodge_left:'Dodge_Left', dodge_right:'Dodge_Right',
+    backflip:'BackFlip',
+    // Slide (UAL2)
+    slide_start:'Slide_Start', slide_loop:'Slide_Loop', slide_exit:'Slide_Exit',
+    // Climb
+    climb_enter:'Climb_Enter', climb_exit:'Climb_Exit', climb_idle:'Climb_Idle_Loop',
+    climb_up:'Climb_Up_Loop', climb_down:'Climb_Down_Loop',
+    climb_left:'Climb_Left_Loop', climb_right:'Climb_Right_Loop',
+    climb_ledge:'ClimbLedge', climb_ledge_rm:'ClimbLedge_RM',
+    climb_ledge_1m:'ClimbUp_1m_RM',
+    // Swim
+    swim_fwd:'Swim_Fwd_Loop', swim_idle:'Swim_Idle_Loop',
+    // Turn in place
+    turn_L:'Turn90_L', turn_R:'Turn90_R',
+    // Combat — Épée
+    sword_enter:'Sword_Enter', sword_exit:'Sword_Exit', sword_idle:'Sword_Idle',
+    sword_atk:'Sword_Attack', sword_atk_std:'Sword_Attack_Standing',
+    sword_a:'Sword_Regular_A', sword_a_rec:'Sword_Regular_A_Rec',
+    sword_b:'Sword_Regular_B', sword_b_rec:'Sword_Regular_B_Rec',
+    sword_combo:'Sword_Regular_Combo', sword_block:'Sword_Block',
+    sword_dash:'Sword_Dash_RM', shield_one:'Shield_OneShot', shield_dash:'Shield_Dash_RM',
+    // Combat — Poings
+    punch_jab:'Punch_Jab', punch_cross:'Punch_Cross', kick:'Kick',
+    hook:'Melee_Hook', hook_rec:'Melee_Hook_Rec',
+    punchkick_enter:'PunchKick_Enter', punchkick_exit:'PunchKick_Exit',
+    throw:'OverhandThrow',
+    // Combat — Magie
+    spell_enter:'Spell_Simple_Enter', spell_exit:'Spell_Simple_Exit',
+    spell_idle:'Spell_Simple_Idle_Loop', spell_shoot:'Spell_Simple_Shoot',
+    spell2_enter:'Spell_Double_Enter', spell2_exit:'Spell_Double_Exit',
+    spell2_idle:'Spell_Double_Idle_Loop', spell2_shoot:'Spell_Double_Shoot_Loop',
+    // Combat — Arc (UAL2 Source)
+    bow_idle:'Bow_Aim_Neutral',
+    bow_aim_u:'Bow_Aim_Up', bow_aim_d:'Bow_Aim_Down',
+    bow_notch:'Bow_Notch', bow_shoot:'Bow_Shoot', bow_rapid:'Bow_RapidShoot_Loop',
+    // Hits / Mort
+    hit_chest:'Hit_Chest', hit_head:'Hit_Head',
+    hit_shl:'Hit_Shoulder_L', hit_shr:'Hit_Shoulder_R', hit_stomach:'Hit_Stomach',
+    hit_knockback:'Hit_Knockback',
+    death1:'Death01', death2:'Death02',
+    // Interactions
+    interact:'Interact', pickup_table:'PickUp_Table', pickup_kneel:'PickUp_Kneeling',
+    push_enter:'Push_Enter', push_loop:'Push_Loop', push_exit:'Push_Exit',
+    consume:'Consume', drink:'Drink',
+    // Assise / Sol
+    sit_enter:'Sitting_Enter', sit_loop:'Sitting_Idle_Loop',
+    sit_loop2:'Sitting_Idle02_Loop', sit_loop3:'Sitting_Idle03_Loop',
+    sit_nod:'Sitting_Nodding_Loop', sit_talk:'Sitting_Talking_Loop', sit_exit:'Sitting_Exit',
+    gnd_enter:'GroundSit_Enter', gnd_loop:'GroundSit_Idle_Loop', gnd_exit:'GroundSit_Exit',
+    lay:'LayToIdle',
+    // Émotes
+    dance:'Dance_Loop', celebrate:'Celebration', cry:'Crying',
+    yes:'Yes', wave:'Idle_Rail_Call', idle_fold:'Idle_FoldArms_Loop',
+    idle_lantern:'Idle_Lantern_Loop', idle_no:'Idle_No_Loop',
+    rps_rock:'Idle_Rock', rps_paper:'Idle_Paper', rps_scissors:'Idle_Scissors',
+    talk:'Idle_Talking_Loop',
+    // Divers
+    tpose:'A_TPose', driving:'Driving_Loop', zombie:'Zombie_Walk_Fwd_Loop',
+
+    // ── UAL2 Source ──────────────────────────────────────────────
+    // Vault / Parkour
+    safety_vault:'SafetyVault_RM',
+    step_up:'StepUp_RM',
+    climb_1m:'ClimbUp_1m_RM',
+    climb_2m:'ClimbUp_2m_RM',
+    get_off_wall:'GetOffWall_2m_RM',
+    wall_run_l:'WallRun_L_Loop',
+    wall_run_r:'WallRun_R_Loop',
+    wall_run_jmp_l:'WallRun_Jump_L',
+    wall_run_jmp_r:'WallRun_Jump_R',
+    double_jump:'DoubleJump',
+    kip_up:'KipUp',
+    jog_flip:'JogToFlip',
+    turn180_l:'Turn180_L_RM',
+    turn180_r:'Turn180_R_RM',
+    // Walk (source — plus fluide)
+    walk_fwd:'Walk_Fwd_Loop',
+    walk_bwd:'Walk_Bwd_Loop',
+    walk_l:'Walk_L_Loop',
+    walk_r:'Walk_R_Loop',
+    walk_carry:'Walk_Carry_Loop',
+    // Combat aérien
+    sword_air_a:'Sword_Aerial_A', sword_air_b:'Sword_Aerial_B',
+    sword_air_idle:'Sword_Aerial_Idle_Loop',
+    sword_uppercut:'Sword_UpperCut_RM', sword_ground_pound:'Sword_GroundPound_RM',
+    melee_uppercut:'Melee_Uppercut', melee_knee:'Melee_Knee',
+    // Idles / Emotes
+    surprise:'Surprise', idle_shield:'Idle_Shield_Loop',
+    idle_rail:'Idle_Rail_Loop',
+    // Actions monde
+    fish_cast:'Fish_Cast', fish_cast_idle:'Fish_Cast_Idle_Loop', fish_reel:'Fish_Reel',
+    mining:'Mining_Loop', harvest:'Farm_Harvest', chop:'TreeChopping_Loop',
+    plant:'Farm_PlantSeed', water:'Farm_Watering',
+    chest_open:'Chest_Open', bandage:'Bandage_Loop',
+    lay_down:'IdleToLay', lay_up:'LayToIdle',
+    // Air étendu
+    lift_air_idle:'LiftAir_Idle_Loop', lift_air_fall:'LiftAir_Fall_Loop',
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDERER + SCÈNE
+// ═══════════════════════════════════════════════════════════════
+const canvas = document.getElementById('vp');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled  = true;
+renderer.shadowMap.type     = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+renderer.toneMapping        = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0c10);
+scene.fog        = new THREE.Fog(0x0a0c10, 30, 80);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.05, 200);
+camera.position.set(0, 6, 14);
+
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Lumières ───────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0xc8d8f0, 1.8);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff4d0, 3.0);
+sun.position.set(12, 20, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far  = 80;
+sun.shadow.camera.left = -25;
+sun.shadow.camera.right = 25;
+sun.shadow.camera.top  = 25;
+sun.shadow.camera.bottom = -25;
+sun.shadow.bias = -0.001;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x6080c0, 0.8);
+fill.position.set(-8, 5, -10);
+scene.add(fill);
+
+const torchA = new THREE.PointLight(0xff8833, 2.0, 8, 2);
+torchA.position.set(-8, 3, -4);
+scene.add(torchA);
+const torchB = new THREE.PointLight(0xff6622, 1.5, 6, 2);
+torchB.position.set(10, 2.5, 6);
+scene.add(torchB);
+
+// ═══════════════════════════════════════════════════════════════
+//  OBSTACLE COURSE — matériaux réutilisables
+// ═══════════════════════════════════════════════════════════════
+const matStone = new THREE.MeshStandardMaterial({ color:0x3a3530, roughness:0.9, metalness:0.0 });
+const matStoneL= new THREE.MeshStandardMaterial({ color:0x504840, roughness:0.85, metalness:0.0 });
+const matWood  = new THREE.MeshStandardMaterial({ color:0x5a3f25, roughness:0.95, metalness:0.0 });
+const matWoodL = new THREE.MeshStandardMaterial({ color:0x7a5530, roughness:0.9,  metalness:0.0 });
+const matGrass = new THREE.MeshStandardMaterial({ color:0x1a2810, roughness:1.0,  metalness:0.0 });
+const matWater = new THREE.MeshStandardMaterial({ color:0x1a3050, roughness:0.1,  metalness:0.3, transparent:true, opacity:0.75 });
+const matMetal = new THREE.MeshStandardMaterial({ color:0x404858, roughness:0.4,  metalness:0.8 });
+
+function box(w,h,d, mat, rx=0,ry=0,rz=0) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.castShadow = m.receiveShadow = true;
+    m.rotation.set(rx,ry,rz);
+    return m;
+}
+
+// Collecte des meshes solides pour la physique raycast
+const solidMeshes = [];
+const climbableMeshes = [];  // surfaces verticales grimpables
+const waterZones = [];       // { minX,maxX,minZ,maxZ,y }
+
+function addSolid(mesh, options={}) {
+    scene.add(mesh);
+    if (options.climbable) climbableMeshes.push(mesh);
+    else if (!options.noCollide) solidMeshes.push(mesh);
+    return mesh;
+}
+
+// ── Sol principal ──────────────────────────────────────────────
+const floor = box(60, 0.5, 60, matStone);
+floor.position.set(0, -0.25, 0);
+addSolid(floor);
+
+// Dalles de sol variées
+for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+    const slab = box(1.9, 0.05, 1.9, Math.random()>0.5?matStone:matStoneL);
+    slab.position.set(i*2, 0.02, j*2 - 8);
+    addSolid(slab, {noCollide:true});
+}
+
+// ── Zone 1 : ESCALIERS (test montée/descente, step jump) ──────
+// 5 marches de 0.35m de haut, 0.8m de profond
+const stairMat = matStoneL;
+for (let s = 0; s < 5; s++) {
+    const st = box(4, 0.35, 0.8, stairMat);
+    st.position.set(-16, 0.175 + s*0.35, -3 - s*0.8);
+    addSolid(st);
+}
+// Palier en haut
+const stairTop = box(4, 0.35, 4, stairMat);
+stairTop.position.set(-16, 0.175 + 5*0.35, -7.5);
+addSolid(stairTop);
+
+// ── Zone 2 : MUR DE GRIMPE + REBORD (ClimbLedge) ───────────────
+// Mur vertical 3m, 4m de large
+const climbWall = box(4, 4, 0.4, matStone);
+climbWall.position.set(-8, 2, -14);
+climbWall.userData.climbable = true;
+addSolid(climbWall, {climbable:true});
+// Plateforme derrière le mur
+const climbTop = box(4, 0.4, 3, matStoneL);
+climbTop.position.set(-8, 4.2, -15.5);
+addSolid(climbTop);
+// Garde-fou derrière
+const guardrail = box(4, 0.8, 0.15, matMetal);
+guardrail.position.set(-8, 4.8, -17);
+addSolid(guardrail);
+
+// ── Zone 3 : PLATEFORME HAUTE (saut enchaîné) ─────────────────
+// Petites caisses en escalier pour atteindre une plateforme 4m
+const crateH = [0.7, 1.4, 2.1, 2.8];
+for (let i = 0; i < 4; i++) {
+    const cr = box(1.2, crateH[i], 1.2, matWood);
+    cr.position.set(8 + i*1.6, crateH[i]/2, -6 - i*0.5);
+    addSolid(cr);
+}
+// Plateforme finale haute
+const highPlat = box(5, 0.4, 5, matStoneL);
+highPlat.position.set(14, 3.2, -10);
+addSolid(highPlat);
+// Mur derrière pour test de grimpe haute
+const highWall = box(5, 5, 0.4, matStone);
+highWall.position.set(14, 2.5, -12.8);
+highWall.userData.climbable = true;
+addSolid(highWall, {climbable:true});
+
+// ── Zone 4 : MUR BAS (vault / roulade par dessus) ─────────────
+const lowWall = box(4, 0.9, 0.4, matStone);
+lowWall.position.set(0, 0.45, -5);
+lowWall.userData.vaultable = true;
+addSolid(lowWall);
+
+// Mur moyen (saut requis)
+const midWall = box(3, 1.4, 0.4, matStone);
+midWall.position.set(4, 0.7, -5);
+addSolid(midWall);
+
+// ── Zone 5 : RAMPE / PENTE (slide) ────────────────────────────
+const ramp = box(5, 0.3, 8, matStoneL);
+ramp.rotation.x = 0.34; // ~20°
+ramp.position.set(-4, 1.0, 8);
+addSolid(ramp);
+
+// ── Zone 6 : PISCINE / EAU (swim) ─────────────────────────────
+const poolFloor = box(8, 0.3, 8, matStone);
+poolFloor.position.set(10, -1.25, 8);
+addSolid(poolFloor);
+// Bords
+const poolN = box(8, 0.5, 0.3, matStoneL);
+poolN.position.set(10, -0.5, 4.15);
+addSolid(poolN);
+const poolS = poolN.clone(); poolS.position.set(10, -0.5, 11.85); addSolid(poolS);
+const poolE = box(0.3, 0.5, 8, matStoneL);
+poolE.position.set(13.85, -0.5, 8); addSolid(poolE);
+const poolW = poolE.clone(); poolW.position.set(6.15, -0.5, 8); addSolid(poolW);
+// Surface eau (pas solide, déco)
+const waterSurf = box(7.4, 0.05, 7.4, matWater);
+waterSurf.position.set(10, -0.55, 8);
+waterSurf.renderOrder = 1;
+scene.add(waterSurf);
+waterZones.push({ minX:6.2, maxX:13.8, minZ:4.2, maxZ:11.8, y:-0.5 });
+
+// ── Zone 7 : PONT SUSPENDU (traversée) ────────────────────────
+const bridgeW = box(1.8, 0.25, 14, matWood);
+bridgeW.position.set(-20, 2.8, 0);
+addSolid(bridgeW);
+// Piliers
+for (const pz of [-6, 0, 6]) {
+    const pil = box(0.4, 5.6, 0.4, matStone);
+    pil.position.set(-20, 1.4, pz);
+    addSolid(pil);
+}
+// Rambardes
+const rbL = box(0.08, 0.8, 14, matMetal); rbL.position.set(-20.8, 3.2, 0); scene.add(rbL);
+const rbR = box(0.08, 0.8, 14, matMetal); rbR.position.set(-19.2, 3.2, 0); scene.add(rbR);
+// Rampe d'accès pont
+const bridgeRamp = box(1.8, 0.25, 3.5, matWood);
+bridgeRamp.rotation.x = -0.58;
+bridgeRamp.position.set(-20, 1.4, 7.8);
+addSolid(bridgeRamp);
+
+// ── Zone 8 : BANCS (sitting emote) ────────────────────────────
+const benchSeat = box(1.8, 0.18, 0.5, matWood);
+benchSeat.position.set(0, 0.52, 4);
+addSolid(benchSeat);
+const benchBackA = box(1.8, 0.6, 0.08, matWood);
+benchBackA.position.set(0, 0.9, 4.29);
+scene.add(benchBackA);
+// Second banc
+const bench2 = benchSeat.clone(); bench2.position.set(3, 0.52, 4); addSolid(bench2);
+
+// ── Zone 9 : OBSTACLES VARIÉS (parcours agility) ──────────────
+// Colonnes à esquiver
+for (const [x,z] of [[6,2],[7.5,0],[6,-2],[8,-3]]) {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.3,3,8), matStone);
+    col.position.set(x, 1.5, z);
+    col.castShadow = col.receiveShadow = true;
+    addSolid(col);
+}
+// Poutres à enjamber (faibles hauteurs, roll / crouch)
+for (const [x,z] of [[2,2],[2,0],[2,-2]]) {
+    const beam = box(0.25, 0.4, 4, matWood);
+    beam.position.set(x, 0.5, z);
+    addSolid(beam);
+}
+
+// ── Zone 10 : TONNEAU POUSSABLE (push_loop) ───────────────────
+const barrelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.7, 10);
+const barrel = new THREE.Mesh(barrelGeo, matWoodL);
+barrel.position.set(-3, 0.35, 2);
+barrel.castShadow = true;
+barrel.userData.pushable = true;
+scene.add(barrel);
+
+// ── Décorations environnement ──────────────────────────────────
+// Torches
+for (const [x,z] of [[-8,3],[-8,-3],[8,3],[8,-3],[-20,8],[-20,-8]]) {
+    const torch = box(0.08, 0.6, 0.08, matWood);
+    torch.position.set(x, 1.8, z);
+    scene.add(torch);
+    const flame = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.06,0.15,6), new THREE.MeshBasicMaterial({color:0xff8833}));
+    flame.position.set(x, 2.2, z);
+    scene.add(flame);
+}
+// Hautes herbes / végétation autour
+for (let i = 0; i < 20; i++) {
+    const gx = (Math.random()-0.5)*55, gz = (Math.random()-0.5)*55;
+    if (Math.abs(gx)<25 && Math.abs(gz)<25) continue;
+    const tree = new THREE.Mesh(new THREE.CylinderGeometry(0,0.8,2.5,5), new THREE.MeshStandardMaterial({color:0x1a3010,roughness:1}));
+    tree.position.set(gx, 1.25, gz);
+    tree.castShadow = true;
+    scene.add(tree);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.15,1,5), new THREE.MeshStandardMaterial({color:0x3a2a10,roughness:1}));
+    trunk.position.set(gx, 0.5, gz);
+    scene.add(trunk);
+}
+
+// Panneau indicatif (déco)
+function makeSign(text, x, y, z, ry=0) {
+    const post = box(0.07,1.5,0.07, matWood);
+    post.position.set(x, y+0.75, z);
+    post.rotation.y = ry;
+    scene.add(post);
+}
+makeSign('STAIRS', -14, 0, 0);
+makeSign('CLIMB',  -6, 0, -12);
+makeSign('SWIM',   8, 0, 4);
+makeSign('SLIDE',  -2, 0, 6);
+
+// ═══════════════════════════════════════════════════════════════
+//  PHYSIQUE — Raycaster
+// ═══════════════════════════════════════════════════════════════
+const _rayDown    = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0.05, 50);
+const _rayFwd     = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(), 0, 1.0);
+const _rayFwdHigh = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(), 0, 1.0);
+const _allGeo     = [];  // sera rempli après chargement (hors SkinnedMesh)
+
+function buildGeoList() {
+    // Collecte tous les meshes statiques (hors SkinnedMesh du perso et eau)
+    scene.traverse(o => {
+        if (o.isMesh && !o.isSkinnedMesh && o !== waterSurf) _allGeo.push(o);
+    });
+}
+
+function getGroundY(px, pz, searchFrom=5) {
+    _rayDown.ray.origin.set(px, searchFrom, pz);
+    const hits = _rayDown.intersectObjects(_allGeo, false);
+    if (hits.length) return hits[0].point.y;
+    return 0;
+}
+
+function getWallHit(px, py, pz, dirX, dirZ, dist=1.1) {
+    const dir = new THREE.Vector3(dirX, 0, dirZ).normalize();
+    _rayFwd.ray.origin.set(px, py + 0.8, pz);
+    _rayFwd.ray.direction.copy(dir);
+    _rayFwd.far = dist;
+    const hits = _rayFwd.intersectObjects([...solidMeshes, ...climbableMeshes], false);
+    return hits.length ? hits[0] : null;
+}
+
+/**
+ * isClimbableWall(hit) — détermine si un hit de mur est escaladable.
+ *
+ * Conditions :
+ *  1. Mur explicitement tagué userData.climbable  → toujours vrai
+ *  2. Auto-détection : surface verticale (normale ~horizontale)
+ *     ET le sommet de l'objet est au moins 1 m au-dessus du point de contact
+ *     (évite de grimper des rebords trop bas ou des marches d'escalier)
+ */
+function isClimbableWall(hit) {
+    if (!hit) return false;
+    if (hit.object.userData.climbable) return true;
+    if (hit.object.userData.noClimb)   return false;  // explicitement exclu
+
+    // Normale en espace monde
+    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    const isVertical = Math.abs(normal.y) < 0.25; // mur vertical (normale horizontale)
+    if (!isVertical) return false;
+
+    // Hauteur disponible au-dessus du point de contact
+    const box3 = new THREE.Box3().setFromObject(hit.object);
+    const heightAbove = box3.max.y - hit.point.y;
+    return heightAbove > 1.0;
+}
+
+function isInWater(px, pz) {
+    for (const z of waterZones) {
+        if (px >= z.minX && px <= z.maxX && pz >= z.minZ && pz <= z.maxZ) return z;
+    }
+    return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ÉTAT DU JEU
+//
+//  Architecture pipeline :
+//  ┌─ COUCHE 3 — traversal  : '' | 'slide' | 'climb' | 'swim'
+//  │   Override total → géré par fonctions spécialisées
+//  ├─ COUCHE 2 — posture    : 'stand' | 'crouch' | 'crawl'
+//  │   Transitions via setPosture() avec anims enter/exit
+//  ├─ COUCHE 1 — moveMode   : 'walk' | 'jog' | 'sprint'
+//  │   Dérivé dynamiquement (shift/walkToggle/stamina)
+//  └─ COUCHE 0 — airPhase   : '' | 'start' | 'loop' | 'land'
+//      Saut / chute indépendant de la posture
+// ═══════════════════════════════════════════════════════════════
+const STATE = {
+    // ── Physique ─────────────────────────────────────────────────
+    pos:       new THREE.Vector3(0, 0.1, 0),
+    vel:       new THREE.Vector3(),
+    vy:        0,
+    yaw:       0,
+    yawTarget: 0,
+    grounded:  true,
+    airVelX:   0,
+    airVelZ:   0,
+
+    // ── Posture : 'stand' | 'crouch' | 'crawl' ───────────────────
+    //   Transitions via setPosture() — jamais assigner directement
+    posture:    'stand',
+
+    // ── Mode marche toggle (Caps Lock). Sprint = Shift+W dynamique. ──
+    // false = Course (run)  |  true = Marche (walk)
+    walkToggle: false,
+
+    // ── Timer blend crawl ↔ crouch ────────────────────────────────
+    // Décrémenté chaque frame — pendant ce délai, correction sol utilise le set large
+    postureBlendTimer: 0,
+
+    // ── Traversal : '' | 'slide' | 'climb' | 'swim' ──────────────
+    //   Override posture + moveMode. setTraversal() pour changer.
+    traversal:  '',
+    slideDir:   null,
+    slideTimer: 0,
+    climbWallNormal: new THREE.Vector3(),
+    climbWallPos:    new THREE.Vector3(),
+
+    // ── Phase aérienne : '' | 'start' | 'loop' | 'land' ──────────
+    jumpPhase:  '',
+    launchY:    0,   // Y au décollage — hauteur de chute calculée à l'atterrissage
+
+    // ── One-shot lock ──────────────────────────────────────────────
+    oneShotLock: false,
+
+    // ── Roll / Dodge movement ──────────────────────────────────────
+    rolling:   false,
+    rollDir:   null,   // THREE.Vector3
+    rollTime:  0,      // timer de décélération roll
+    dodging:   false,
+    dodgeDir:  null,   // THREE.Vector3
+    dodgeTime: 0,      // timer de décélération dodge
+
+    // ── Stamina ────────────────────────────────────────────────────
+    stamina:    100,
+
+    // ── Combat ─────────────────────────────────────────────────────
+    combatMode:     0,
+    inCombatStance: false,
+    blocking:       false,
+
+    // ── Emote ──────────────────────────────────────────────────────
+    inEmote:       false,
+    emoteName:     '',
+    emoteLoop:     false,
+    sitting:       false,
+    groundSitting: false,
+
+    // ── Divers ─────────────────────────────────────────────────────
+    idleTimer:        0,
+    wasSprintingLast: false,
+    hasShield:        false,   // bouclier équipé main gauche → active le block
+    // ── État sprint : 'off' | 'enter' | 'on' | 'exit' ─────────────
+    sprintState: 'off',
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS TRANSITION — toute la logique de changement d'état ici
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * setPosture(target) — 'stand' | 'crouch' | 'crawl'
+ * Gère exit de l'état précédent → enter du suivant avec les bonnes anims.
+ * Règle : jamais modifier STATE.posture directement.
+ *
+ * Cas spécial crawl ↔ crouch :
+ *   Pas d'exit/enter — blend direct long vers l'idle cible (~0.5 s).
+ *   Le mixer interpole la pose sol→accroupi sans passer par la position debout.
+ */
+function setPosture(target) {
+    if (STATE.posture === target) return;
+    if (STATE.traversal !== '' || !STATE.grounded || STATE.oneShotLock) return;
+
+    const prev    = STATE.posture;
+    STATE.posture = target;
+
+    // ── Transition directe crawl ↔ crouch ─────────────────────────
+    if ((prev === 'crawl' && target === 'crouch') ||
+        (prev === 'crouch' && target === 'crawl')) {
+        STATE.walkToggle = false;
+        // Blend long (0.5 s) : interpolation directe entre pose allongée et accroupie.
+        // postureBlendTimer permet à la correction sol d'utiliser le set large
+        // pendant toute la durée du blend (les bones sont entre les deux poses).
+        const BLEND = 0.5;
+        STATE.postureBlendTimer = BLEND;
+        playAnim(target === 'crouch' ? 'crouch_idle' : 'crawl_idle', BLEND);
+        return;
+    }
+
+    if (target === 'stand') {
+        const exitAnim = prev === 'crouch' ? 'crouch_exit' : 'crawl_exit';
+        playAnim(exitAnim, 0.1, () => { STATE.oneShotLock = false; playAnim('idle', 0.2); });
+        STATE.oneShotLock = true;
+    } else if (target === 'crouch') {
+        STATE.walkToggle = false;
+        playAnim('crouch_enter', 0.1, () => { STATE.oneShotLock = false; playAnim('crouch_idle', 0.15); });
+        STATE.oneShotLock = true;
+    } else if (target === 'crawl') {
+        STATE.walkToggle = false;
+        playAnim('crawl_enter', 0.1, () => { STATE.oneShotLock = false; playAnim('crawl_idle', 0.15); });
+        STATE.oneShotLock = true;
+    }
+}
+
+/**
+ * setTraversal(mode) — '' | 'slide' | 'climb' | 'swim'
+ * Entrée/sortie des modes de traversal (override posture+moveMode).
+ */
+function setTraversal(mode) {
+    STATE.traversal = mode;
+}
+
+/**
+ * getMoveSpeed(isSprinting) — vitesse selon posture + moveMode.
+ */
+function getMoveSpeed(isSprinting) {
+    if (STATE.posture === 'crouch') return CROUCH_SPD;
+    if (STATE.posture === 'crawl')  return CRAWL_SPD;
+    if (isSprinting)                return SPRINT_SPD;
+    if (STATE.walkToggle)           return WALK_SPD;
+    return JOG_SPD;
+}
+
+// ── Helpers sélection d'animation directionnelle ──────────────
+
+function _dirAnim(prefix, fwd, bck, lft, rgt) {
+    if (fwd && !bck)  return prefix + '_fwd';
+    if (bck && !fwd)  return prefix + '_bwd';
+    if (lft && !rgt)  return prefix + '_left';
+    return prefix + '_right';
+}
+
+// En locomotion libre, le personnage pivote toujours vers la direction de déplacement
+// (STATE.yawTarget = atan2 du _moveDir) → il se déplace toujours "vers l'avant".
+// Les animations directionnelles (bwd/left/right) sont réservées au combat strafe.
+function _walkAnim() { return 'walk_fwd'; }
+function _jogAnim()  { return 'jog'; }
+
+// ── Label HUD pour le mode courant ────────────────────────────
+function getLocoLabel(isSprinting) {
+    if (STATE.traversal === 'swim')   return 'Nage';
+    if (STATE.traversal === 'climb')  return 'Grimpe';
+    if (STATE.traversal === 'slide')  return 'Slide';
+    if (STATE.posture   === 'crouch') return 'Accroupi';
+    if (STATE.posture   === 'crawl')  return 'Rampant';
+    if (isSprinting)                  return 'Sprint';
+    if (STATE.walkToggle)             return 'Marche';
+    return 'Course';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════════════════════
+const keys      = new Set();
+const justDown  = new Set();
+const justUp    = new Set();
+let mouseL = false, mouseR = false, mouseRJust = false, mouseLJust = false;
+
+const GAME_KEYS = new Set([
+    'KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+    'Space','ShiftLeft','ShiftRight','ControlLeft','ControlRight',
+    'KeyC','KeyE','KeyF','KeyG','KeyK','KeyQ','KeyR','KeyV',
+    'CapsLock',
+    'Digit0','Digit1','Digit2','Digit3','Digit4','Tab',
+]);
+window.addEventListener('keydown', e => {
+    if (!keys.has(e.code)) justDown.add(e.code);
+    keys.add(e.code);
+    if (GAME_KEYS.has(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => {
+    justUp.add(e.code);
+    keys.delete(e.code);
+});
+canvas.addEventListener('mousedown', e => {
+    if (e.button === 0) {
+        mouseL = true; mouseLJust = true;
+        if (CAM.mode === 'third') {
+            // Clic gauche : orbite caméra uniquement — aucun effet sur le personnage
+            CAM.leftHeld = true;
+            CAM.prevX = e.clientX; CAM.prevY = e.clientY;
+            if (!CAM.locked) canvas.requestPointerLock?.();
+        }
+    }
+    if (e.button === 2) { mouseR = true; mouseRJust = true; }
+});
+canvas.addEventListener('mouseup', e => {
+    if (e.button === 0) {
+        mouseL = false;
+        CAM.leftHeld = false;
+        // Libérer pointer lock si personne d'autre ne le tient (clic droit ou cursor lock)
+        if (CAM.mode === 'third' && !CAM.cursorLock && !CAM.rightHeld)
+            document.exitPointerLock?.();
+    }
+    if (e.button === 2) mouseR = false;
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function consumeKey(code) {
+    const had = justDown.has(code);
+    justDown.delete(code);
+    return had;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CAMÉRA — style Witcher 3
+// ═══════════════════════════════════════════════════════════════
+const CAM = {
+    mode:  'third',   // 'third' | 'first'
+    yaw:   0,
+    pitch: 0.35,
+    dist:  11,
+    minDist: 1.2,
+    maxDist: 22,
+    sensitivity: 0.003,
+    effectiveDist: 11,
+    locked:        false,
+    cursorLock:    false,
+    rightHeld:     false,
+    leftHeld:      false,   // clic gauche = orbite caméra (indépendant du personnage)
+    frozenMovYaw:  0,       // inutilisé — conservé pour compatibilité
+    prevX: 0, prevY: 0,
+    leanTarget:  0,
+    leanCurrent: 0,
+    fpYaw:   0,
+    fpPitch: 0,
+};
+const _camOffset = new THREE.Vector3();
+const _camTarget = new THREE.Vector3();
+
+canvas.addEventListener('mousedown', e => {
+    if (e.button === 2) {
+        CAM.rightHeld = true;
+        CAM.prevX = e.clientX; CAM.prevY = e.clientY;
+        if (!CAM.locked) canvas.requestPointerLock?.();
+    }
+});
+canvas.addEventListener('mouseup', e => {
+    if (e.button === 2) {
+        CAM.rightHeld = false;
+        if (CAM.mode === 'third' && !CAM.cursorLock) document.exitPointerLock?.();
+    }
+});
+canvas.addEventListener('mousemove', e => {
+    if (CAM.mode === 'third') {
+        if (CAM.leftHeld && !CAM.rightHeld) {
+            // Clic gauche seul : orbite caméra libre — yaw perso gelé (frozenMovYaw)
+            const dx = CAM.locked ? e.movementX : (e.clientX - CAM.prevX);
+            const dy = CAM.locked ? e.movementY : (e.clientY - CAM.prevY);
+            CAM.prevX = e.clientX; CAM.prevY = e.clientY;
+            CAM.yaw   -= dx * CAM.sensitivity;
+            CAM.pitch += dy * CAM.sensitivity;
+            CAM.pitch  = Math.max(-1.4, Math.min(1.4, CAM.pitch));
+        } else if (CAM.rightHeld) {
+            // Clic droit : orbite caméra + direction perso suit la caméra
+            const dx = CAM.locked ? e.movementX : (e.clientX - CAM.prevX);
+            const dy = CAM.locked ? e.movementY : (e.clientY - CAM.prevY);
+            CAM.prevX = e.clientX; CAM.prevY = e.clientY;
+            CAM.yaw   -= dx * CAM.sensitivity;
+            CAM.pitch += dy * CAM.sensitivity;
+            CAM.pitch  = Math.max(-1.4, Math.min(1.4, CAM.pitch));
+        } else if (CAM.cursorLock && CAM.locked) {
+            // Cursor lock sans clic : camera + direction perso bougent ensemble
+            CAM.yaw   -= e.movementX * CAM.sensitivity;
+            CAM.pitch += e.movementY * CAM.sensitivity;
+            CAM.pitch  = Math.max(-1.4, Math.min(1.4, CAM.pitch));
+        }
+    }
+    if (CAM.mode === 'first' && CAM.locked) {
+        CAM.fpYaw   -= e.movementX * 0.002;
+        CAM.fpPitch -= e.movementY * 0.002;
+        CAM.fpPitch  = Math.max(-1.3, Math.min(1.3, CAM.fpPitch));
+    }
+});
+canvas.addEventListener('wheel', e => {
+    if (CAM.mode === 'third') {
+        CAM.dist = Math.max(CAM.minDist, Math.min(CAM.maxDist, CAM.dist + e.deltaY*0.012));
+    }
+}, {passive:true});
+document.addEventListener('pointerlockchange', () => {
+    CAM.locked = document.pointerLockElement === canvas;
+});
+
+function toggleCamLock() {
+    CAM.cursorLock = !CAM.cursorLock;
+    if (CAM.cursorLock) canvas.requestPointerLock?.();
+    else document.exitPointerLock?.();
+}
+
+function toggleCamMode() {
+    if (CAM.mode === 'third') {
+        CAM.fpYaw   = CAM.yaw;
+        CAM.fpPitch = CAM.pitch - 0.35;
+        CAM.mode    = 'first';
+        CAM.cursorLock = true;
+        canvas.requestPointerLock?.();
+        document.getElementById('crosshair').style.display = 'block';
+        document.getElementById('cam-mode-lbl').textContent = '1ST';
+    } else {
+        CAM.yaw     = CAM.fpYaw;
+        CAM.pitch   = CAM.fpPitch + 0.35;
+        CAM.mode    = 'third';
+        if (!CAM.cursorLock) document.exitPointerLock?.();
+        document.getElementById('crosshair').style.display = 'none';
+        document.getElementById('cam-mode-lbl').textContent = '3RD';
+    }
+}
+
+function updateCamera(delta) {
+    CAM.leanCurrent += (CAM.leanTarget * 3 - CAM.leanCurrent) * Math.min(1, delta * 10);
+
+    if (CAM.mode === 'first') {
+        camera.position.set(STATE.pos.x, STATE.pos.y + 1.72, STATE.pos.z);
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = CAM.fpYaw;
+        camera.rotation.x = CAM.fpPitch;
+        camera.rotation.z = -CAM.leanCurrent * 0.18;
+    } else {
+        const distTarget = CAM.dist;
+        CAM.effectiveDist += (distTarget - CAM.effectiveDist) * Math.min(1, delta*4);
+        const sinY = Math.sin(CAM.yaw), cosY = Math.cos(CAM.yaw);
+        const cosP = Math.cos(CAM.pitch), sinP = Math.sin(CAM.pitch);
+        const d = CAM.effectiveDist;
+
+        const _vLift = Math.min(2.0, d * 0.38); // scale avec la distance → pas de dérive d'angle au zoom
+        _camOffset.set(sinY*cosP*d, sinP*d + _vLift, cosY*cosP*d);
+        _camTarget.copy(STATE.pos).add(new THREE.Vector3(0,1.4,0));
+
+        const desired = _camTarget.clone().add(_camOffset);
+
+        // Clamp caméra au-dessus du sol : la caméra ne traverse jamais le terrain
+        const CAM_FLOOR_MARGIN = 0.3;
+        const camGroundY = getGroundY(desired.x, desired.z, desired.y + 5);
+        if (desired.y < camGroundY + CAM_FLOOR_MARGIN) {
+            desired.y = camGroundY + CAM_FLOOR_MARGIN;
+        }
+
+        const speed = (CAM.cursorLock && !CAM.rightHeld) ? 0.55 : 0.12;
+        camera.position.lerp(desired, speed);
+        camera.lookAt(_camTarget);
+    }
+}
+
+function getCamYaw() {
+    return CAM.mode === 'first' ? CAM.fpYaw : CAM.yaw;
+}
+
+/** Yaw utilisé pour le déplacement du personnage.
+ *  En cursor lock + clic gauche (orbite libre) → yaw gelé au moment du clic.
+ *  Sinon → suit la caméra normalement. */
+function getMovementYaw() {
+    if (CAM.mode === 'first') return CAM.fpYaw;
+    return CAM.yaw;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHARGEUR GLB — cache simple
+// ═══════════════════════════════════════════════════════════════
+const _gltfCache = {};
+const loader = new GLTFLoader();
+function loadGLTF(url) {
+    if (_gltfCache[url]) return Promise.resolve(_gltfCache[url]);
+    return new Promise((res, rej) => loader.load(url, g => { _gltfCache[url] = g; res(g); }, undefined, rej));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BONE SCALING — même algo que char-builder
+// ═══════════════════════════════════════════════════════════════
+function applyIsolatedScales(root, overrides, restPos) {
+    if (!root || !Object.keys(overrides).length) return;
+    root.traverse(n => {
+        if (!n.isBone) return;
+        n.scale.set(1,1,1);
+        const rp = restPos[n.name]; if (rp) n.position.copy(rp);
+    });
+    const wsMap = {};
+    root.traverse(node => {
+        if (!node.isBone) return;
+        const pWS = node.parent?.isBone ? (wsMap[node.parent.name]??1) : 1;
+        const s   = overrides[node.name];
+        if (pWS !== 1) { const rp = restPos[node.name]; if (rp) node.position.copy(rp).multiplyScalar(1/pWS); }
+        if (s !== undefined) { node.scale.setScalar(s); wsMap[node.name] = (s<0.01)?1:pWS*s; }
+        else if (pWS !== 1) { node.scale.setScalar(1/pWS); wsMap[node.name] = 1; }
+        else wsMap[node.name] = 1;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SYSTÈME PERSONNAGE — chargement + animations
+// ═══════════════════════════════════════════════════════════════
+let charRoot   = null;
+let mixer      = null;
+const actions  = {};       // nom clip → AnimationAction
+let activeAct  = null;
+let activeClip = '';
+let yOffset    = 0;
+let boneOverrides = {};
+let boneRestPos   = {};
+
+function _injectBodyShader(mesh) {
+    const sk = mesh.skeleton?.bones; if (!sk) return;
+    const iNeck = sk.findIndex(b => b.name === 'neck_01');
+    const iHead = sk.findIndex(b => b.name === 'Head');
+    if (iNeck < 0 && iHead < 0) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(m => {
+        if (!m) return;
+        m.onBeforeCompile = sh => {
+            sh.uniforms.uINeck = {value:iNeck}; sh.uniforms.uIHead = {value:iHead};
+            sh.vertexShader = sh.vertexShader.replace('#include <skinning_pars_vertex>',
+                `#include <skinning_pars_vertex>\nuniform float uINeck,uIHead;\nvarying float vKeepW;`);
+            sh.vertexShader = sh.vertexShader.replace('#include <skinning_vertex>',
+                `#include <skinning_vertex>\n{float n=uINeck,h=uIHead;vKeepW=(skinIndex.x==n||skinIndex.x==h)?skinWeight.x:0.0;vKeepW+=(skinIndex.y==n||skinIndex.y==h)?skinWeight.y:0.0;vKeepW+=(skinIndex.z==n||skinIndex.z==h)?skinWeight.z:0.0;vKeepW+=(skinIndex.w==n||skinIndex.w==h)?skinWeight.w:0.0;}`);
+            sh.fragmentShader = sh.fragmentShader.replace('void main() {', `varying float vKeepW;\nvoid main() {\nif(vKeepW<0.15)discard;`);
+        };
+        m.needsUpdate = true;
+    });
+}
+
+function _injectEyeShader(mesh, hex) {
+    if (!hex) return;
+    const col = new THREE.Color(hex);
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(m => {
+        if (!m) return;
+        m.onBeforeCompile = sh => {
+            sh.uniforms.uIrisColor = {value:col};
+            sh.fragmentShader = sh.fragmentShader.replace('void main() {', `uniform vec3 uIrisColor;\nvoid main() {`);
+            sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>',
+                `#include <map_fragment>\n{float lum=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));float mask=1.0-smoothstep(0.08,0.45,lum);diffuseColor.rgb=mix(diffuseColor.rgb,uIrisColor,mask*0.88);}`);
+        };
+        m.needsUpdate = true;
+    });
+}
+
+let headBone = null;
+const _headWP = new THREE.Vector3();
+
+function _attachHead(baseRoot, outfitRoot, eyeColor) {
+    const outfitBones = {};
+    outfitRoot.traverse(n => { if (n.isBone) outfitBones[n.name] = n; });
+
+    // Même logique que character.js :
+    // - Mesh "tête liée" (neck_01 ou Head dans le squelette) → rebind + shader
+    // - Mesh "corps complet" (neck/Head + spine) → _injectBodyShader (neck/head visible seulement)
+    // - Mesh "yeux" → shader iris
+    // Le body zone shader cache tout sauf cou/tête : l'outfit fournit tout le reste.
+    const isHeadRelated = n => n.isSkinnedMesh &&
+        n.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
+    const isBodyMesh = n => {
+        if (!n.skeleton) return false;
+        const names = new Set(n.skeleton.bones.map(b => b.name));
+        return (names.has('neck_01') || names.has('Head')) &&
+               (names.has('spine_01') || names.has('spine_02') || names.has('spine_03'));
+    };
+
+    const toAttach = [];
+    baseRoot.traverse(n => { if (isHeadRelated(n)) toAttach.push(n); });
+
+    for (const node of toAttach) {
+        const newBones = node.skeleton.bones.map(b => outfitBones[b.name]);
+        if (newBones.some(b => !b)) { console.warn('[GT] os manquant pour', node.name); continue; }
+
+        const newSkel = new THREE.Skeleton(newBones, node.skeleton.boneInverses);
+        node.position.set(0,0,0); node.rotation.set(0,0,0); node.scale.setScalar(1);
+        node.bind(newSkel, new THREE.Matrix4());
+
+        if (isBodyMesh(node)) {
+            // Corps de base : cloner les matériaux, puis shader neck/head uniquement
+            const cloned = (Array.isArray(node.material) ? node.material : [node.material])
+                .map(m => m ? m.clone() : m);
+            node.material = Array.isArray(node.material) ? cloned : cloned[0];
+            for (const m of cloned) if (m) m.side = THREE.DoubleSide;
+            _injectBodyShader(node);
+        } else {
+            const mats = Array.isArray(node.material) ? node.material : [node.material];
+            for (const m of mats) if (m) m.side = THREE.DoubleSide;
+            if (node.name.toLowerCase() === 'eyes') _injectEyeShader(node, eyeColor);
+        }
+
+        if (!headBone) headBone = outfitBones['head'] || outfitBones['Head'] || null;
+        node.castShadow = true; node.frustumCulled = false;
+        charRoot.add(node);
+        console.log('[GT] Attaché :', node.name, isBodyMesh(node) ? '(body+shader)' : '');
+    }
+}
+
+function _attachHair(hairScene) {
+    if (!charRoot) return;
+    const outfitBones = {};
+    charRoot.traverse(n => { if (n.isBone) outfitBones[n.name] = n; });
+    const toAttach = [];
+    hairScene.traverse(n => { if (n.isSkinnedMesh) toAttach.push(n); });
+    for (const node of toAttach) {
+        const newBones = node.skeleton.bones.map(b => outfitBones[b.name]);
+        if (newBones.some(b => !b)) continue;
+        const clonedMats = (Array.isArray(node.material)?node.material:[node.material]).map(m=>m?m.clone():m);
+        node.material = Array.isArray(node.material) ? clonedMats : clonedMats[0];
+        for (const m of clonedMats) if (m) m.side = THREE.DoubleSide;
+        node.bind(new THREE.Skeleton(newBones, node.skeleton.boneInverses), new THREE.Matrix4());
+        node.castShadow = true; node.frustumCulled = false;
+        charRoot.add(node);
+    }
+}
+
+async function loadCharacter(cfg) {
+    setLoadSub('Chargement outfit…');
+    const meshGltf  = await loadGLTF(cfg.meshUrl);
+    setLoadProgress(15);
+    setLoadSub('Chargement animations UAL1 Source…');
+    const animGltf1 = await loadGLTF(ANIM_SOURCES[0]);
+    setLoadProgress(40);
+    setLoadSub('Chargement animations UAL2 Standard…');
+    const animGltf2 = await loadGLTF(ANIM_SOURCES[1]);
+    setLoadProgress(55);
+    setLoadSub('Chargement animations UAL2 Source…');
+    const animGltf3 = await loadGLTF(ANIM_SOURCES[2]);
+    setLoadProgress(70);
+    setLoadSub('Chargement corps de base…');
+    const baseGltf  = await loadGLTF(cfg.baseUrl);
+    setLoadProgress(80);
+
+    // Prépare les cheveux/barbe en parallèle
+    const hairGltf  = cfg.hairUrl  ? await loadGLTF(cfg.hairUrl)  : null;
+    const beardGltf = cfg.beardUrl ? await loadGLTF(cfg.beardUrl) : null;
+    setLoadProgress(90);
+    setLoadSub('Construction du personnage…');
+
+    const root = meshGltf.scene;
+    root.traverse(c => {
+        if (c.isMesh) {
+            c.castShadow = c.receiveShadow = true;
+            c.frustumCulled = false;
+            const mats = Array.isArray(c.material)?c.material:[c.material];
+            for (const m of mats) if (m) m.side = THREE.DoubleSide;
+        }
+    });
+
+    root.position.set(0,0,0); root.rotation.set(0,0,0);
+    const box3 = new THREE.Box3().setFromObject(root);
+    const ht = box3.max.y - box3.min.y;
+    root.scale.setScalar(1.75 / ht);
+    const box3b = new THREE.Box3().setFromObject(root);
+    yOffset = -box3b.min.y;
+
+    charRoot = root;
+    mixer    = new THREE.AnimationMixer(root);
+    scene.add(root);
+
+    // Proportions — filtrer les scales de visibilité (< 0.1 = squish builder)
+    // Ne garder que les vraies proportions morphologiques du personnage
+    const filterProp = (scales) => {
+        const r = {};
+        for (const [b, s] of Object.entries(scales || {})) if (s >= 0.1) r[b] = s;
+        return r;
+    };
+    boneOverrides = { ...filterProp(cfg.boneScaleBody), ...filterProp(cfg.boneScaleOutfit) };
+    boneRestPos   = {};
+    root.traverse(n => { if (n.isBone) boneRestPos[n.name] = n.position.clone(); });
+
+    // Index clips — UAL1 → UAL2 Standard → UAL2 Source (dernier = priorité)
+    const available = {};
+    for (const clip of animGltf1.animations) available[clip.name] = clip;
+    for (const clip of animGltf2.animations) available[clip.name] = clip;
+    for (const clip of animGltf3.animations) available[clip.name] = clip;
+    console.log(`[GT] ${Object.keys(available).length} clips disponibles`);
+
+    // Enregistrer les actions
+    for (const [state, clipName] of Object.entries(CLIP_MAP)) {
+        const clip = available[clipName];
+        if (clip) {
+            actions[state] = mixer.clipAction(clip);
+            actions[state].setLoop(THREE.LoopRepeat, Infinity);
+        }
+    }
+
+    // Attacher tête, cheveux, barbe
+    _attachHead(baseGltf.scene, root, cfg.eyeColor);
+    if (hairGltf)  _attachHair(hairGltf.scene);
+    if (beardGltf) _attachHair(beardGltf.scene);
+
+    // Couleur cheveux
+    if (cfg.hairColor) {
+        const hcol = new THREE.Color(cfg.hairColor);
+        root.traverse(n => {
+            if (!n.isSkinnedMesh) return;
+            const nm = n.name.toLowerCase();
+            if (!nm.startsWith('hair_') && nm !== 'eyebrows') return;
+            const mats = Array.isArray(n.material)?n.material:[n.material];
+            for (const m of mats) if (m) m.color.copy(hcol);
+        });
+    }
+
+    // Couleur peau
+    if (cfg.skinColor) {
+        const sc = new THREE.Color(cfg.skinColor);
+        // Appliqué via uniforme si shader injecté, sinon skip (géré au niveau builder)
+    }
+
+    buildGeoList();
+    _buildWeaponPanel();
+    setLoadProgress(100);
+    playAnim('idle', 0.1);
+    return root;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ARMES — attachement aux bones de main
+// ═══════════════════════════════════════════════════════════════
+
+// ── Définition des armes ─────────────────────────────────────────
+// len    : longueur cible en mètres monde (pour normalisation)
+// pos    : offset de position local dans le bone (grip)
+// rot    : offset de rotation local (Euler XYZ) pour orienter l'arme dans la main
+// hand   : 'R' ou 'L' (slot par défaut)
+// combat : mode combat activé en équipant cette arme (0=aucun, 1=épée, 2=poings, 3=magie, 4=arc)
+const WEAPON_DEFS = {
+    sword:   { label:'Épée',    path:'assets/environment/props/Sword_Bronze.gltf',   hand:'R', len:0.75, pos:[0,0.06,0.01], rot:[Math.PI/2,0,0], combat:1 },
+    axe:     { label:'Hache',   path:'assets/environment/props/Axe_Bronze.gltf',     hand:'R', len:0.55, pos:[0,0.05,0   ], rot:[Math.PI/2,0,0], combat:5 },
+    knife:   { label:'Couteau', path:'assets/environment/props/Table_Knife.gltf',    hand:'R', len:0.22, pos:[0,0.03,0   ], rot:[Math.PI/2,0,0], combat:6 },
+    torch:   { label:'Torche',  path:'assets/environment/props/Torch_Metal.gltf',    hand:'R', len:0.40, pos:[0,0.04,0   ], rot:[Math.PI/2,0,0], combat:8 },
+    pickaxe: { label:'Pioche',  path:'assets/environment/props/Pickaxe_Bronze.gltf', hand:'R', len:0.60, pos:[0,0.06,0.01], rot:[Math.PI/2,0,0], combat:7 },
+    shield:  { label:'Bouclier',path:'assets/environment/props/Shield_Wooden.gltf',  hand:'L', len:0.45, pos:[0,0,0.03   ], rot:[0,0,Math.PI/2], combat:-1 },
+};
+// combat  1 = Épée      — combo sword_a/b/combo + sword_block
+// combat  2 = Poings    — punch_jab/cross/kick (sans arme)
+// combat  3 = Magie
+// combat  4 = Arc
+// combat  5 = Hache     — chop loop (bûcheronnage) + parade
+// combat  6 = Couteau   — guard sword_idle + stabs rapides (jab/knee/hook)
+// combat  7 = Pioche    — mining loop uniquement
+// combat  8 = Torche    — idle_torch + walk_carry, aucun combat
+// combat -1 = Bouclier  — main gauche, active le block uniquement
+
+// Slots : quelles armes peuvent aller dans chaque main
+const SLOT_WEAPONS = {
+    R: ['sword','axe','knife','torch','pickaxe'],
+    L: ['shield','sword','axe'],
+};
+
+let equippedR    = null;   // mesh main droite
+let equippedL    = null;   // mesh main gauche
+let activeKeyR   = 'none';
+let activeKeyL   = 'none';
+let gripEditSlot = null;   // slot en cours d'édition dans le panel grip
+
+function _findBone(name) {
+    if (!charRoot) return null;
+    let found = null;
+    charRoot.traverse(n => { if (n.isBone && n.name.toLowerCase() === name.toLowerCase()) found = n; });
+    return found;
+}
+
+function _clearSlot(slot) {
+    const bone = _findBone(slot === 'R' ? 'hand_r' : 'hand_l');
+    if (slot === 'R' && equippedR) { if (bone) bone.remove(equippedR); equippedR = null; activeKeyR = 'none'; }
+    if (slot === 'L' && equippedL) { if (bone) bone.remove(equippedL); equippedL = null; activeKeyL = 'none'; }
+}
+
+async function equipWeapon(slot, key) {
+    if (!charRoot) return;
+
+    // Toggle : re-cliquer sur l'arme active la déséquipe
+    const curKey = slot === 'R' ? activeKeyR : activeKeyL;
+    if (curKey === key) {
+        _clearSlot(slot);
+        _applyWeaponCombatMode();
+        _refreshWeaponUI();
+        _hideGripEditor();
+        return;
+    }
+
+    _clearSlot(slot);
+    if (key === 'none') { _applyWeaponCombatMode(); _refreshWeaponUI(); _hideGripEditor(); return; }
+
+    const def = WEAPON_DEFS[key];
+    if (!def) return;
+
+    const bone = _findBone(slot === 'R' ? 'hand_r' : 'hand_l');
+    if (!bone) { console.warn('[Arme] Bone introuvable'); return; }
+
+    let gltf;
+    try { gltf = await loadGLTF(def.path); }
+    catch(e) { console.error('[Arme] Chargement :', def.path, e); return; }
+
+    const mesh = gltf.scene.clone(true);
+    mesh.traverse(n => { n.castShadow = true; });
+
+    // Normaliser à la longueur cible en espace monde
+    const box     = new THREE.Box3().setFromObject(mesh);
+    const meshLen = box.getSize(new THREE.Vector3()).length();
+    const sc      = (def.len / charRoot.scale.x) / meshLen;
+    mesh.scale.setScalar(sc);
+    mesh.position.set(...def.pos);
+    mesh.rotation.set(...def.rot);
+
+    bone.add(mesh);
+    if (slot === 'R') { equippedR = mesh; activeKeyR = key; }
+    else              { equippedL = mesh; activeKeyL = key; }
+
+    _applyWeaponCombatMode();
+    _refreshWeaponUI();
+    _showGripEditor(slot, key, mesh);
+    showNotif(def.label + (slot === 'R' ? ' ▶ main droite' : ' ▶ main gauche'));
+}
+
+// Active le mode combat correspondant aux armes équipées
+function _applyWeaponCombatMode() {
+    // Bouclier main gauche → active STATE.hasShield (block indépendant du mode)
+    STATE.hasShield = (activeKeyL === 'shield');
+
+    // Mode offensif : déterminé par la main droite
+    const defR = activeKeyR !== 'none' ? WEAPON_DEFS[activeKeyR] : null;
+    const newMode = (defR && defR.combat > 0) ? defR.combat : 0;
+
+    if (newMode !== STATE.combatMode) {
+        if (STATE.inCombatStance) exitCombatStance();
+        STATE.combatMode = newMode;
+        if (newMode > 0) enterCombatStance();
+    }
+
+    // Màj HUD (COMBAT_ICONS / COMBAT_NAMES définis au niveau module)
+    document.getElementById('combat-mode').textContent =
+        STATE.combatMode > 0 ? (COMBAT_ICONS[STATE.combatMode]||'') + ' ' + COMBAT_NAMES[STATE.combatMode]
+        : STATE.hasShield ? '🛡 Bouclier' : '—';
+}
+
+// ── Grip editor (sliders temps réel) ─────────────────────────────
+// ── Persistance des grips dans localStorage ───────────────────
+const GRIP_STORAGE_KEY = 'darkrpg_weapon_grips_v1';
+
+function _loadGrips() {
+    try { return JSON.parse(localStorage.getItem(GRIP_STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function _saveGrip(key, px, py, pz, rx, ry, rz, sc) {
+    const grips = _loadGrips();
+    grips[key] = { px, py, pz, rx, ry, rz, sc };
+    localStorage.setItem(GRIP_STORAGE_KEY, JSON.stringify(grips));
+}
+function _gripFor(key) {
+    // Retourne les offsets sauvegardés, ou les défauts de WEAPON_DEFS
+    const saved = _loadGrips()[key];
+    if (saved) return saved;
+    const def = WEAPON_DEFS[key];
+    return { px: def.pos[0], py: def.pos[1], pz: def.pos[2],
+             rx: def.rot[0], ry: def.rot[1], rz: def.rot[2], sc: 1.0 };
+}
+
+function _showGripEditor(slot, key, mesh) {
+    gripEditSlot = slot;
+    const grip = document.getElementById('wp-grip');
+    grip.style.display = 'block';
+
+    // Mémoriser le scale normalisé de base (avant multiplicateur)
+    if (!mesh.userData._baseScale) mesh.userData._baseScale = mesh.scale.x;
+
+    // Charger les offsets sauvegardés (ou défauts)
+    const g = _gripFor(key);
+
+    const setSlider = (id, val) => {
+        document.getElementById(id).value = val;
+        document.getElementById(id + '-v').textContent = (+val).toFixed(id === 'wg-sc' ? 2 : 3);
+    };
+    setSlider('wg-px', g.px); setSlider('wg-py', g.py); setSlider('wg-pz', g.pz);
+    setSlider('wg-rx', g.rx); setSlider('wg-ry', g.ry); setSlider('wg-rz', g.rz);
+    setSlider('wg-sc', g.sc);
+
+    // Appliquer immédiatement les offsets chargés
+    mesh.position.set(g.px, g.py, g.pz);
+    mesh.rotation.set(g.rx, g.ry, g.rz);
+    mesh.scale.setScalar(mesh.userData._baseScale * g.sc);
+
+    const update = () => {
+        const px = +document.getElementById('wg-px').value;
+        const py = +document.getElementById('wg-py').value;
+        const pz = +document.getElementById('wg-pz').value;
+        const rx = +document.getElementById('wg-rx').value;
+        const ry = +document.getElementById('wg-ry').value;
+        const rz = +document.getElementById('wg-rz').value;
+        const sc = +document.getElementById('wg-sc').value;
+        document.getElementById('wg-px-v').textContent = px.toFixed(3);
+        document.getElementById('wg-py-v').textContent = py.toFixed(3);
+        document.getElementById('wg-pz-v').textContent = pz.toFixed(3);
+        document.getElementById('wg-rx-v').textContent = rx.toFixed(3);
+        document.getElementById('wg-ry-v').textContent = ry.toFixed(3);
+        document.getElementById('wg-rz-v').textContent = rz.toFixed(3);
+        document.getElementById('wg-sc-v').textContent = sc.toFixed(2);
+        mesh.position.set(px, py, pz);
+        mesh.rotation.set(rx, ry, rz);
+        mesh.scale.setScalar(mesh.userData._baseScale * sc);
+        // Auto-sauvegarde à chaque changement
+        _saveGrip(key, px, py, pz, rx, ry, rz, sc);
+    };
+
+    // Nettoyer les anciens listeners (re-attachement à chaque équipement)
+    const sliderIds = ['wg-px','wg-py','wg-pz','wg-rx','wg-ry','wg-rz','wg-sc'];
+    sliderIds.forEach(id => {
+        const el = document.getElementById(id);
+        const fresh = el.cloneNode(true);
+        el.parentNode.replaceChild(fresh, el);
+        document.getElementById(id).addEventListener('input', update);
+    });
+    // Re-attacher la valeur après clone
+    setSlider('wg-px', g.px); setSlider('wg-py', g.py); setSlider('wg-pz', g.pz);
+    setSlider('wg-rx', g.rx); setSlider('wg-ry', g.ry); setSlider('wg-rz', g.rz);
+    setSlider('wg-sc', g.sc);
+}
+
+function _hideGripEditor() {
+    document.getElementById('wp-grip').style.display = 'none';
+    gripEditSlot = null;
+}
+
+function logGripOffsets() {
+    const key = gripEditSlot === 'R' ? activeKeyR : activeKeyL;
+    const mesh = gripEditSlot === 'R' ? equippedR : equippedL;
+    if (!mesh) return;
+    const p = mesh.position, r = mesh.rotation;
+    const sc = mesh.scale.x / (mesh.userData._baseScale || mesh.scale.x);
+    // Sauvegarde réelle dans localStorage
+    _saveGrip(key, p.x, p.y, p.z, r.x, r.y, r.z, sc);
+    console.log('[Grip]', `${key}: pos:[${p.x.toFixed(4)},${p.y.toFixed(4)},${p.z.toFixed(4)}] rot:[${r.x.toFixed(4)},${r.y.toFixed(4)},${r.z.toFixed(4)}] sc:${sc.toFixed(3)}`);
+    showNotif('✓ Grip sauvegardé — ' + key);
+}
+
+function _refreshWeaponUI() {
+    document.querySelectorAll('.wp-btn').forEach(btn => {
+        btn.classList.toggle('active',
+            (btn.dataset.slot === 'R' && btn.dataset.key === activeKeyR) ||
+            (btn.dataset.slot === 'L' && btn.dataset.key === activeKeyL)
+        );
+    });
+}
+
+function _buildWeaponPanel() {
+    const addBtn = (containerId, slot, key) => {
+        const lbl = key === 'none' ? 'Aucune' : (WEAPON_DEFS[key]?.label ?? key);
+        const btn = document.createElement('button');
+        btn.className = 'wp-btn'; btn.dataset.slot = slot; btn.dataset.key = key;
+        btn.textContent = lbl;
+        btn.addEventListener('click', () => equipWeapon(slot, key));
+        document.getElementById(containerId).appendChild(btn);
+    };
+    addBtn('wp-btns-R', 'R', 'none');
+    for (const k of SLOT_WEAPONS.R) addBtn('wp-btns-R', 'R', k);
+    addBtn('wp-btns-L', 'L', 'none');
+    for (const k of SLOT_WEAPONS.L) addBtn('wp-btns-L', 'L', k);
+    _refreshWeaponUI();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ANIMATION — transitions
+// ═══════════════════════════════════════════════════════════════
+const ONE_SHOT_ANIMS = new Set([
+    'jump_start','jump_land','ninja_jump','ninja_land',
+    'roll','dodge_left','dodge_right','backflip',
+    'crouch_enter','crouch_exit',
+    'crawl_enter','crawl_exit',
+    'sprint_enter','sprint_exit',
+    'slide_start','slide_exit',
+    'climb_enter','climb_exit','climb_ledge','climb_ledge_rm','climb_ledge_1m',
+    'sword_enter','sword_exit','sword_atk','sword_atk_std',
+    'sword_a','sword_a_rec','sword_b','sword_b_rec','sword_combo',
+    'punch_jab','punch_cross','kick','hook','hook_rec','throw',
+    'punchkick_enter','punchkick_exit',
+    'spell_enter','spell_exit','spell_shoot',
+    'spell2_enter','spell2_exit',
+    'hit_chest','hit_head','hit_shl','hit_shr','hit_stomach','hit_knockback',
+    'death1','death2',
+    'interact','pickup_table','pickup_kneel',
+    'push_enter','push_exit',
+    'sit_enter','sit_exit',
+    'gnd_enter','gnd_exit','lay',
+    'celebrate','cry','backflip','consume','drink','yes',
+    'turn_L','turn_R',
+    'shield_one',
+    // UAL2 Source — one-shots
+    'safety_vault','step_up','climb_1m','climb_2m','get_off_wall',
+    'double_jump','kip_up','jog_flip',
+    'turn180_l','turn180_r',
+    'wall_run_jmp_l','wall_run_jmp_r',
+    'sword_air_a','sword_air_b','sword_uppercut','sword_ground_pound',
+    'melee_uppercut','melee_knee',
+    'surprise','chest_open','fish_cast','fish_reel',
+    'plant','harvest','water',
+    'lay_down','lay_up','bandage',
+    'bow_notch','bow_shoot',
+]);
+
+const LOOP_ANIMS = new Set([
+    'idle','idle_look','idle_tired','idle_torch','idle_fold','idle_lantern','idle_no',
+    'talk','wave',
+    'walk','walk_formal','jog','jog_bwd','jog_left','jog_right','jog_leanL','jog_leanR',
+    'sprint','climb_idle','climb_up','climb_down','climb_left','climb_right',
+    'crouch_idle','crouch_fwd','crouch_bwd','crouch_left','crouch_right',
+    'crawl_idle','crawl_fwd','crawl_bwd','crawl_left','crawl_right',
+    'jump_loop','ninja_idle',
+    'slide_loop','swim_fwd','swim_idle',
+    'wall_run_l','wall_run_r','sword_air_idle',
+    'lift_air_idle','lift_air_fall',
+    'fish_cast_idle','mining','chop','idle_shield','idle_rail',
+    'walk_fwd','walk_bwd','walk_l','walk_r','walk_carry',
+    'sword_idle','sword_block','sword_dash','shield_dash',
+    'spell_idle','spell2_idle','spell2_shoot',
+    'bow_idle','bow_aim_u','bow_aim_d','bow_rapid',
+    'push_loop',
+    'sit_loop','sit_loop2','sit_loop3','sit_nod','sit_talk',
+    'gnd_loop','driving','zombie',
+    'dance','rps_rock','rps_paper','rps_scissors',
+    'tpose',
+]);
+
+let oneShotCallback = null;
+
+function playAnim(name, crossfade=0.15, onEnd=null) {
+    const act = actions[name];
+    if (!act) {
+        // Animation introuvable — débloquer oneShotLock immédiatement (évite lock permanent)
+        if (onEnd) {
+            STATE.oneShotLock = false;
+            oneShotCallback = null;
+            onEnd();
+        } else if (name !== 'idle') {
+            playAnim('idle', crossfade);
+        }
+        return;
+    }
+    if (activeClip === name) {
+        if (onEnd && LOOP_ANIMS.has(name)) { /* loop, pas de callback */ }
+        return;
+    }
+
+    // Nettoyer l'ancien callback stale avant de démarrer la nouvelle anim.
+    // Si une anim one-shot est interrompue, son oneShotLock doit être libéré
+    // — sinon le personnage reste gelé indéfiniment.
+    if (oneShotCallback) {
+        mixer.removeEventListener('finished', oneShotCallback);
+        oneShotCallback = null;
+        STATE.oneShotLock = false;
+    }
+    if (activeAct) activeAct.fadeOut(crossfade);
+
+    const isOnce = ONE_SHOT_ANIMS.has(name);
+    act.setLoop(isOnce ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    act.clampWhenFinished = isOnce;
+    act.reset().fadeIn(crossfade).play();
+
+    activeAct  = act;
+    activeClip = name;
+
+    if (isOnce && onEnd) {
+        const handler = (e) => {
+            if (e.action === act) {
+                mixer.removeEventListener('finished', handler);
+                oneShotCallback = null;
+                onEnd();
+            }
+        };
+        mixer.addEventListener('finished', handler);
+        oneShotCallback = handler;
+    }
+
+    document.getElementById('dbg-anim').textContent = name + ' → ' + (CLIP_MAP[name]||'?');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ROUE D'ÉMOTES
+// ═══════════════════════════════════════════════════════════════
+const EMOTES = [
+    { icon:'💃', name:'Dance',     anim:'dance',       loop:true  },
+    { icon:'🎉', name:'Célébrer', anim:'celebrate',   loop:false },
+    { icon:'😢', name:'Pleurer',  anim:'cry',         loop:false },
+    { icon:'🔄', name:'Backflip', anim:'backflip',    loop:false },
+    { icon:'🍺', name:'Boire',    anim:'drink',       loop:false },
+    { icon:'🪑', name:'S\'asseoir',anim:'sit_enter',  loop:true  },
+    { icon:'🧘', name:'Sol',      anim:'gnd_enter',   loop:true  },
+    { icon:'👋', name:'Saluer',   anim:'wave',        loop:true  },
+];
+
+let emoteWheelOpen = false;
+let hoveredEmote   = -1;
+
+function buildEmoteWheel() {
+    const ring = document.getElementById('emote-ring');
+    const r    = 95;   // rayon en px
+    EMOTES.forEach((em, i) => {
+        const angle = (i / EMOTES.length) * Math.PI * 2 - Math.PI/2;
+        const x = Math.cos(angle) * r + 130 - 26;
+        const y = Math.sin(angle) * r + 130 - 26;
+        const slot = document.createElement('div');
+        slot.className = 'emote-slot';
+        slot.style.left = x + 'px';
+        slot.style.top  = y + 'px';
+        slot.innerHTML  = `<div class="eicon">${em.icon}</div><div class="ename">${em.name}</div>`;
+        slot.dataset.idx = i;
+        slot.addEventListener('click', () => triggerEmote(i));
+        slot.addEventListener('mouseenter', () => { hoveredEmote = i; slot.classList.add('hovered'); });
+        slot.addEventListener('mouseleave', () => { slot.classList.remove('hovered'); });
+        ring.appendChild(slot);
+    });
+}
+
+function openEmoteWheel() {
+    emoteWheelOpen = true;
+    document.getElementById('emote-wheel').style.display = 'block';
+    document.exitPointerLock?.();
+}
+
+function closeEmoteWheel() {
+    emoteWheelOpen = false;
+    document.getElementById('emote-wheel').style.display = 'none';
+    if (CAM.cursorLock) canvas.requestPointerLock?.();
+}
+
+function triggerEmote(idx) {
+    const em = EMOTES[idx];
+    if (!em || STATE.inEmote) return;
+    closeEmoteWheel();
+
+    // Sortir du mode assise si on y est
+    if (STATE.sitting || STATE.groundSitting) exitSitting();
+
+    if (em.anim === 'sit_enter') {
+        startSitting();
+        return;
+    }
+    if (em.anim === 'gnd_enter') {
+        startGroundSitting();
+        return;
+    }
+
+    STATE.inEmote   = true;
+    STATE.emoteName = em.anim;
+    STATE.emoteLoop = em.loop;
+    STATE.oneShotLock = !em.loop;
+
+    if (em.loop) {
+        playAnim(em.anim, 0.2);
+    } else {
+        playAnim(em.anim, 0.1, () => {
+            STATE.inEmote = false;
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.3);
+        });
+    }
+    showNotif(em.name);
+}
+
+function exitEmote() {
+    if (!STATE.inEmote) return;
+    STATE.inEmote = false;
+    STATE.oneShotLock = false;
+    playAnim('idle', 0.25);
+}
+
+// ── Assise ─────────────────────────────────────────────────────
+function startSitting() {
+    STATE.sitting = true;
+    STATE.inEmote = true;
+    playAnim('sit_enter', 0.2, () => {
+        playAnim('sit_loop', 0.15);
+        STATE.oneShotLock = false;
+    });
+    STATE.oneShotLock = true;
+    showNotif('Assis — Espace pour se lever');
+}
+
+function startGroundSitting() {
+    STATE.groundSitting = true;
+    STATE.inEmote = true;
+    playAnim('gnd_enter', 0.2, () => {
+        playAnim('gnd_loop', 0.15);
+        STATE.oneShotLock = false;
+    });
+    STATE.oneShotLock = true;
+    showNotif('Assis au sol — Espace pour se lever');
+}
+
+function exitSitting() {
+    if (STATE.sitting) {
+        STATE.sitting = false;
+        STATE.inEmote = false;
+        playAnim('sit_exit', 0.1, () => {
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.2);
+        });
+        STATE.oneShotLock = true;
+    }
+    if (STATE.groundSitting) {
+        STATE.groundSitting = false;
+        STATE.inEmote = false;
+        playAnim('gnd_exit', 0.1, () => {
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.2);
+        });
+        STATE.oneShotLock = true;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+let _notifTimer = 0;
+function showNotif(msg, dur=2.5) {
+    const el = document.getElementById('notif');
+    el.textContent = msg;
+    el.style.opacity = '1';
+    _notifTimer = dur;
+}
+
+// ── Loading progress ───────────────────────────────────────────
+function setLoadProgress(pct) { document.getElementById('loading-bar').style.width = pct+'%'; }
+function setLoadSub(txt)       { document.getElementById('loading-sub').textContent = txt; }
+
+// ═══════════════════════════════════════════════════════════════
+//  PHYSIQUE + STATE MACHINE (appelé chaque frame)
+// ═══════════════════════════════════════════════════════════════
+const _moveDir  = new THREE.Vector3();
+const _flatFwd  = new THREE.Vector3();
+const _flatRight= new THREE.Vector3();
+const _up       = new THREE.Vector3(0,1,0);
+const _yawQ     = new THREE.Quaternion();
+const _tiltQ    = new THREE.Quaternion();
+const _targetQ  = new THREE.Quaternion();
+const _normalV  = new THREE.Vector3();
+
+// Terrain normal (simple, flat sol pour cette page)
+function getTerrainNormal(x,z, out) { out.set(0,1,0); }
+
+const GRAVITY  = 20;
+const WALK_SPD   = 3.2;
+const JOG_SPD    = 5.0;
+const SPRINT_SPD = 8.5;
+const CROUCH_SPD = 2.0;
+const CRAWL_SPD  = 1.4;
+const SWIM_SPD   = 2.5;
+const CLIMB_SPD  = 1.5;
+const ROLL_SPD_MAX  = 5.0;   // vitesse max roulade (décélère linéairement)
+const ROLL_DUR      = 0.85;  // durée estimée animation Roll
+const DODGE_SPD_MAX = 4.0;   // vitesse max esquive
+const DODGE_DUR     = 0.6;   // durée estimée animation Dodge
+
+// ── Fonctions sprint ─────────────────────────────────────────
+function _enterSprint() {
+    STATE.sprintState = 'enter';
+    if (actions['sprint_enter']) {
+        playAnim('sprint_enter', 0.15, () => {
+            if (STATE.sprintState !== 'enter') return; // annulé pendant l'anim
+            STATE.sprintState = 'on';
+            STATE.oneShotLock = false;
+            playAnim('sprint', 0.15);
+        });
+        STATE.oneShotLock = true;
+    } else {
+        STATE.sprintState = 'on'; // pas d'anim enter → sprint direct
+    }
+}
+
+// Annulation propre depuis 'enter' : sprint_enter interrompue avant d'atteindre 'on'
+// → pas de sprint_exit (le perso n'a jamais sprinté), resolveAnim reprend.
+function _cancelSprintEnter() {
+    if (oneShotCallback) {
+        mixer.removeEventListener('finished', oneShotCallback);
+        oneShotCallback = null;
+        STATE.oneShotLock = false;
+    }
+    STATE.sprintState = 'off';
+}
+
+function _exitSprint(moving) {
+    STATE.sprintState = 'exit';
+    if (moving && actions['sprint_exit']) {
+        playAnim('sprint_exit', 0.15, () => {
+            STATE.sprintState = 'off';
+            STATE.oneShotLock = false;
+        });
+        STATE.oneShotLock = true;
+    } else {
+        STATE.sprintState = 'off';
+        // resolveAnim prend le relais (idle ou jog)
+    }
+}
+
+function update(delta) {
+    try { _updateInner(delta); }
+    finally {
+        // Toujours exécuté — même si early return — pour éviter le double-fire
+        mouseLJust = false; mouseRJust = false;
+        justDown.clear(); justUp.clear();
+    }
+}
+
+function _updateInner(delta) {
+    // ── Inputs ────────────────────────────────────────────────
+    const fwd   = keys.has('KeyW') || keys.has('ArrowUp');
+    const bck   = keys.has('KeyS') || keys.has('ArrowDown');
+    const lft   = keys.has('KeyA') || keys.has('ArrowLeft');
+    const rgt   = keys.has('KeyD') || keys.has('ArrowRight');
+    const shift = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    const ctrl  = keys.has('ControlLeft') || keys.has('ControlRight');
+    const spaceJust = consumeKey('Space');
+    const cJust     = consumeKey('KeyC');
+    const capsJust  = consumeKey('CapsLock');
+    const ctrlJust  = consumeKey('ControlLeft') || consumeKey('ControlRight');
+    const fJust     = consumeKey('KeyF');
+    const rJust     = consumeKey('KeyR');
+    const qJust = consumeKey('KeyQ') && shift;   // Shift+Q = esquive gauche
+    const eJust = consumeKey('KeyE') && shift;   // Shift+E = esquive droite
+    const gHeld = keys.has('KeyG');
+    const moving = fwd || bck || lft || rgt;
+
+    // Emote wheel
+    if (gHeld && !emoteWheelOpen) openEmoteWheel();
+    else if (!gHeld && emoteWheelOpen) closeEmoteWheel();
+
+    // Mode combat
+    if (consumeKey('Digit1')) setCombatMode(1);
+    if (consumeKey('Digit2')) setCombatMode(2);
+    if (consumeKey('Digit3')) setCombatMode(3);
+    if (consumeKey('Digit4')) setCombatMode(4);
+    if (consumeKey('Digit0')) setCombatMode(0);
+
+    // Kick
+    if (consumeKey('KeyK')) doKick();
+
+    // Caméra
+    if (consumeKey('Tab')) toggleCamLock();
+    if (consumeKey('KeyV')) toggleCamMode();
+
+    // Lean (Q/E sans Shift)
+    CAM.leanTarget = (!shift && keys.has('KeyQ')) ? -1 : (!shift && keys.has('KeyE')) ? 1 : 0;
+
+    // ── Si emote en cours, gestion limitée ────────────────────
+    if (STATE.sitting || STATE.groundSitting) {
+        if (spaceJust) exitSitting();
+        if (mouseL && mouseLJust) {
+            const loops = STATE.sitting
+                ? ['sit_loop','sit_loop2','sit_loop3','sit_nod','sit_talk']
+                : ['gnd_loop'];
+            playAnim(loops[Math.floor(Math.random()*loops.length)], 0.2);
+        }
+        return;
+    }
+
+    if (STATE.inEmote && STATE.emoteLoop) {
+        if (spaceJust || moving) exitEmote();
+        if (mouseLJust || mouseRJust) exitEmote();
+        return;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  MOUVEMENT + PHYSIQUE — toujours actifs, même en one-shot
+    // ════════════════════════════════════════════════════════════
+
+    const camYaw  = getCamYaw();
+    const moveYaw = getMovementYaw();
+
+    // Direction WASD dans le repère caméra
+    _flatFwd.set(-Math.sin(moveYaw), 0, -Math.cos(moveYaw));
+    _flatRight.set(Math.cos(moveYaw), 0, -Math.sin(moveYaw));
+    _moveDir.set(0,0,0);
+    if (fwd) _moveDir.addScaledVector(_flatFwd,  1);
+    if (bck) _moveDir.addScaledVector(_flatFwd, -1);
+    if (rgt) _moveDir.addScaledVector(_flatRight, 1);
+    if (lft) _moveDir.addScaledVector(_flatRight,-1);
+    const isMoving = _moveDir.lengthSq() > 0.001;
+    if (isMoving) _moveDir.normalize();
+
+    // Sprint : dérivé dynamiquement — jamais stocké dans STATE
+    // fwd retiré : sprint_loop joue dans toutes les directions tant que Shift tenu
+    const isSprinting = shift && isMoving && STATE.stamina > 5
+        && STATE.posture === 'stand' && !STATE.walkToggle
+        && STATE.traversal === '';
+
+    // ── Physique désactivée pendant la grimpe ─────────────────
+    // updateClimbing() gère entièrement pos.x/y/z pendant cette phase.
+    if (STATE.traversal !== 'climb') {
+
+    if (STATE.grounded) {
+        // ── Sol : déplacement normal ──────────────────────────
+        const landingLocked = (
+            activeClip === 'jump_land'   ||
+            activeClip === 'crouch_enter' || activeClip === 'crouch_exit' ||
+            activeClip === 'crawl_enter'  || activeClip === 'crawl_exit'  ||
+            activeClip === 'kip_up'       ||
+            activeClip === 'dodge_left'   || activeClip === 'dodge_right'
+        );
+        if (isMoving && STATE.traversal !== 'slide' && !landingLocked) {
+            const spd = getMoveSpeed(isSprinting);
+            STATE.pos.x += _moveDir.x * spd * delta;
+            STATE.pos.z += _moveDir.z * spd * delta;
+            STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
+            if (isSprinting) STATE.stamina = Math.max(0, STATE.stamina - 15 * delta);
+        }
+        STATE.airVelX = isMoving ? _moveDir.x * (isSprinting ? SPRINT_SPD : JOG_SPD) : 0;
+        STATE.airVelZ = isMoving ? _moveDir.z * (isSprinting ? SPRINT_SPD : JOG_SPD) : 0;
+    } else {
+        // ── Air : carry horizontal + air control ─────────────
+        if (isMoving) {
+            const tgtX = _moveDir.x * JOG_SPD;
+            const tgtZ = _moveDir.z * JOG_SPD;
+            STATE.airVelX += (tgtX - STATE.airVelX) * Math.min(1, 4 * delta);
+            STATE.airVelZ += (tgtZ - STATE.airVelZ) * Math.min(1, 4 * delta);
+            STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
+        }
+        STATE.pos.x += STATE.airVelX * delta;
+        STATE.pos.z += STATE.airVelZ * delta;
+    }
+
+    // ── Physique verticale ─────────────────────────────────────
+    const groundY = getGroundY(STATE.pos.x, STATE.pos.z, STATE.pos.y + 3);
+
+    if (!STATE.grounded) {
+        STATE.vy -= GRAVITY * delta;
+        STATE.pos.y += STATE.vy * delta;
+        if (STATE.pos.y <= groundY) {
+            STATE.pos.y   = groundY;
+            STATE.vy       = 0;
+            STATE.grounded = true;
+            STATE.airVelX  = 0;
+            STATE.airVelZ  = 0;
+            doLand();
+        }
+    } else {
+        if (groundY < STATE.pos.y - 0.08) {
+            STATE.grounded = false;
+            STATE.vy = 0;
+            STATE.launchY = STATE.pos.y;
+        } else {
+            STATE.pos.y = groundY;
+        }
+    }
+
+    } // fin guard traversal !== 'climb'
+
+    // ── Yaw lissé ─────────────────────────────────────────────
+    let _dy = STATE.yawTarget - STATE.yaw;
+    while (_dy >  Math.PI) _dy -= Math.PI * 2;
+    while (_dy < -Math.PI) _dy += Math.PI * 2;
+    STATE.yaw += _dy * Math.min(1, 14 * delta);
+
+    // ── Stamina regen ──────────────────────────────────────────
+    if (!isSprinting) STATE.stamina = Math.min(100, STATE.stamina + 10 * delta);
+
+    // ── Épuisement : idle_tired quand stamina touche 0 ─────────
+    // idleVarActive sert de garde — l'interval n'est créé qu'une seule fois
+    if (STATE.stamina <= 0 && STATE.grounded && STATE.posture === 'stand'
+        && !STATE.oneShotLock && !idleVarActive && !isMoving) {
+        idleVarActive = true;
+        playAnim('idle_tired', 0.3);
+        const _tiredCheck = setInterval(() => {
+            if (STATE.stamina >= 30 || !idleVarActive) {
+                clearInterval(_tiredCheck);
+                if (idleVarActive) {
+                    idleVarActive = false;
+                    playAnim('idle', 0.5);
+                }
+            }
+        }, 500);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  TRANSITIONS / ACTIONS
+    //  Cascade de priorité : Traversal → Posture → Locomotion → Actions
+    // ════════════════════════════════════════════════════════════
+
+    // Raycast anticipé — visible même pendant oneShotLock pour le prompt grimpe
+    _flatFwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+    const wallHit   = getWallHit(STATE.pos.x, STATE.pos.y, STATE.pos.z, _flatFwd.x, _flatFwd.z);
+    const nearClimb = isClimbableWall(wallHit);
+    const nearVault = wallHit && wallHit.object.userData.vaultable && !nearClimb;
+    document.getElementById('climb-prompt').style.display = nearClimb ? 'block' : 'none';
+
+    // ── Déplacement continu roll / dodge (actif même pendant oneShotLock) ──
+    if (STATE.rolling && STATE.rollDir) {
+        STATE.rollTime += delta;
+        const t = Math.max(0, 1 - STATE.rollTime / ROLL_DUR);
+        const spd = ROLL_SPD_MAX * t;
+        STATE.pos.x += STATE.rollDir.x * spd * delta;
+        STATE.pos.z += STATE.rollDir.z * spd * delta;
+    }
+    if (STATE.dodging && STATE.dodgeDir) {
+        STATE.dodgeTime += delta;
+        const t = Math.max(0, 1 - STATE.dodgeTime / DODGE_DUR);
+        const spd = DODGE_SPD_MAX * t;
+        STATE.pos.x += STATE.dodgeDir.x * spd * delta;
+        STATE.pos.z += STATE.dodgeDir.z * spd * delta;
+    }
+
+    // ── GRIMPE — priorité absolue, avant oneShotLock ─────────
+    // Le snap au mur doit s'appliquer même pendant climb_enter.
+    // updateClimbing() gère en interne le guard oneShotLock.
+    if (STATE.traversal === 'climb') {
+        updateClimbing(delta, fwd, bck, lft, rgt, spaceJust, fJust);
+        return;
+    }
+
+    if (STATE.oneShotLock) return;
+
+    // ── COUCHE 3 — TRAVERSAL (autres) ─────────────────────────
+    const waterZone = isInWater(STATE.pos.x, STATE.pos.z);
+    if (waterZone && STATE.pos.y <= waterZone.y) {
+        updateSwimming(delta, fwd, bck, lft, rgt, shift);
+        return;
+    }
+    if (STATE.traversal === 'slide') {
+        updateSlide(delta);
+        return;
+    }
+
+    // ── COUCHE 2 — POSTURE (C / Ctrl) ─────────────────────────
+    // Slide = sprint + C : priorité sur le toggle crouch
+    // Déclenche si sprint actif OU si l'anim sprint est en cours (sprintState on/enter)
+    const canSlide = STATE.posture === 'stand' &&
+        (isSprinting || STATE.sprintState === 'on' || STATE.sprintState === 'enter');
+    if (cJust && canSlide) { startSlide(); return; }
+    // Toggle crouch (C)
+    if (cJust)    setPosture(STATE.posture === 'crouch' ? 'stand' : 'crouch');
+    // Toggle crawl (Ctrl)
+    if (ctrlJust) setPosture(STATE.posture === 'crawl'  ? 'stand' : 'crawl');
+
+    // ── COUCHE 1 — MOVEMODE ────────────────────────────────────
+    // Toggle Marche ↔ Course (Caps Lock) — uniquement en posture stand
+    // 3 modes : Marche (Caps ON) → Run (Caps OFF) → Sprint (Shift maintenu)
+    if (capsJust && STATE.posture === 'stand') {
+        STATE.walkToggle = !STATE.walkToggle;
+        showNotif(STATE.walkToggle ? 'Marche' : 'Course');
+    }
+
+    // ── ACTIONS : Saut / Vault / Grimpe ───────────────────────
+    if (spaceJust && STATE.grounded) {
+        if (STATE.posture === 'stand') {
+            if (nearVault)      doVault(wallHit);
+            else if (nearClimb) enterClimb(wallHit);
+            else                doJump();
+        } else if (STATE.posture === 'crouch') {
+            doCrouchJump();
+        } else if (STATE.posture === 'crawl') {
+            doCrawlJump();
+        }
+    }
+    // Auto-grab mur en l'air : Space ou F en saut vers un mur grimpable
+    if ((spaceJust || fJust) && !STATE.grounded && nearClimb
+        && STATE.traversal === '' && STATE.posture === 'stand') {
+        enterClimb(wallHit);
+    }
+
+    // ── ACTIONS : Interagir (F) ────────────────────────────────
+    if (fJust && STATE.grounded) {
+        if (nearClimb) enterClimb(wallHit);
+        else doInteract();
+    }
+
+    // ── ACTIONS : Roulade (R) ─────────────────────────────────
+    if (rJust && STATE.grounded && STATE.posture === 'stand' && STATE.stamina >= 15) doRoll();
+
+    // ── ACTIONS : Esquive (Shift+Q/E) ─────────────────────────
+    if (qJust && STATE.stamina >= 10) doDodge('left');
+    if (eJust && STATE.stamina >= 10) doDodge('right');
+
+    // ── COUCHE 4 — COMBAT ──────────────────────────────────────
+    if (kickCooldown > 0) kickCooldown -= delta;
+    if (STATE.inCombatStance) updateCombat(delta, mouseLJust, mouseRJust);
+
+    // ── Sprint state machine ────────────────────────────────────
+    // sprintState : 'off' | 'enter' | 'on' | 'exit'
+    // keepSprint  : Shift tenu — maintient le sprint actif indépendamment de isMoving et de la stamina.
+    //   • Survit aux changements de direction (brief isMoving=false entre 2 touches WASD)
+    //   • Pas de stamina ici : évite l'oscillation enter/exit quand stamina ≈ 5
+    // wantSprint  : condition d'ENTRÉE — exige isMoving + stamina > 5
+    const keepSprint = shift
+        && STATE.posture === 'stand' && !STATE.walkToggle && STATE.traversal === '';
+    const wantSprint = keepSprint && isMoving && STATE.stamina > 5;
+    if      (wantSprint   && STATE.sprintState === 'off' && !STATE.oneShotLock)  _enterSprint();
+    else if (!keepSprint  && STATE.sprintState === 'enter') _cancelSprintEnter();
+    else if (!keepSprint  && STATE.sprintState === 'on')    _exitSprint(!isMoving);
+    // 'enter' et 'exit' se terminent via leur callback — pas de retrigger possible
+    STATE.wasSprintingLast = (STATE.sprintState === 'on');
+
+    // ── RESOLVE ANIM — résolution finale de l'anim active ─────
+    if (!STATE.oneShotLock && !STATE.inEmote) {
+        resolveAnim(isMoving, fwd, bck, lft, rgt, isSprinting);
+    }
+
+    // ── Idle variation (30s immobile) ─────────────────────────
+    if (!isMoving && STATE.grounded && !STATE.inEmote && !STATE.inCombatStance && !idleVarActive) {
+        STATE.idleTimer += delta;
+        if (STATE.idleTimer > 30 && !STATE.oneShotLock) triggerIdleVariation();
+    } else if (isMoving) {
+        STATE.idleTimer = 0;
+        idleVarActive   = false;
+    }
+
+} // fin _updateInner
+
+// ═══════════════════════════════════════════════════════════════
+//  RESOLVE ANIM — machine à états animation (cascade de priorité)
+//
+//  Priorité (haute → basse) :
+//  1. Aérien (jumpPhase)
+//  2. Immobile : posture → combat idle → idle
+//  3. En mouvement : posture → moveMode (sprint / walk / jog)
+// ═══════════════════════════════════════════════════════════════
+const IDLE_ANIMS = new Set(['idle','idle_look','idle_tired','idle_torch','idle_fold']);
+
+function resolveAnim(isMoving, fwd, bck, lft, rgt, sprinting) {
+    // ── 1. Aérien ────────────────────────────────────────────────
+    if (!STATE.grounded && STATE.traversal === '') {
+        if (STATE.jumpPhase === 'start') return; // jump_start en cours, ne pas interrompre
+        playAnim('jump_loop', 0.15);
+        return;
+    }
+
+    // ── 2. Immobile ──────────────────────────────────────────────
+    if (!isMoving) {
+        if (STATE.posture === 'crouch') {
+            if (!['crouch_idle','crouch_enter'].includes(activeClip))
+                playAnim('crouch_idle', 0.15);
+        } else if (STATE.posture === 'crawl') {
+            if (!['crawl_idle','crawl_enter'].includes(activeClip))
+                playAnim('crawl_idle', 0.15);
+        } else if (STATE.inCombatStance) {
+            playAnim(getCombatIdleAnim(), 0.15);
+        } else if (!IDLE_ANIMS.has(activeClip)) {
+            playAnim('idle', 0.2);
+        }
+        return;
+    }
+
+    // ── 3. En mouvement ──────────────────────────────────────────
+    // Stopper les boucles outils si le joueur se déplace
+    if (toolLoopActive) { toolLoopActive = false; }
+
+    if (STATE.posture === 'crawl') {
+        playAnim(_dirAnim('crawl', fwd, bck, lft, rgt), 0.15);
+        return;
+    }
+    if (STATE.posture === 'crouch') {
+        playAnim(_dirAnim('crouch', fwd, bck, lft, rgt), 0.12);
+        return;
+    }
+    // Torche — marche avec objet tenu (walk_carry), ignore sprint
+    if (STATE.combatMode === 8) {
+        playAnim('walk_carry', 0.2);
+        return;
+    }
+    // Stand : sprint → walk → jog
+    if (sprinting || STATE.sprintState === 'on') {
+        if (activeClip !== 'sprint') playAnim('sprint', 0.15);
+        return;
+    }
+    if (STATE.walkToggle) {
+        playAnim(_walkAnim(), 0.18);
+        return;
+    }
+    playAnim(_jogAnim(), 0.12);
+}
+
+// ── Idle variations (30s) ─────────────────────────────────────
+const IDLE_VARIANTS = ['idle_look','turn_L','turn_R','idle_fold'];
+let idleVarActive = false;
+
+function triggerIdleVariation() {
+    if (idleVarActive) return;
+    idleVarActive = true;
+    STATE.idleTimer = 0;
+    const variant = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
+    if (variant === 'turn_L' || variant === 'turn_R') {
+        playAnim(variant, 0.1, () => {
+            idleVarActive = false;
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.3);
+        });
+        STATE.oneShotLock = true;
+    } else if (LOOP_ANIMS.has(variant)) {
+        playAnim(variant, 0.2);
+        // Revenir à idle après 6-10s
+        setTimeout(() => {
+            if (idleVarActive) {
+                idleVarActive = false;
+                playAnim('idle', 0.4);
+            }
+        }, 6000 + Math.random()*4000);
+    }
+    showNotif('Idle variation: ' + variant);
+}
+
+// ── Sauter ────────────────────────────────────────────────────
+// blendIn : durée du crossfade vers jump_start (0.08 normal, 0.25 depuis crouch)
+function doJump(blendIn = 0.08) {
+    STATE.vy = 7.5;
+    STATE.grounded = false;
+    STATE.launchY = STATE.pos.y; // mémoriser le sol de départ pour mesurer la chute
+    STATE.stamina -= 12;
+    idleVarActive = false;
+    STATE.jumpPhase = 'start';
+    playAnim('jump_start', blendIn, () => {
+        if (STATE.jumpPhase !== 'start') return; // interrompu (ex: atterrissage immédiat)
+        STATE.jumpPhase = 'loop';
+        playAnim('jump_loop', 0.15);
+    });
+    // PAS de oneShotLock — la physique/mouvement continue pendant le jump_start
+}
+
+// Crouch + Espace : redressement express → saut
+// Pas d'anim crouch_jump dans UAL — blend long de jump_start depuis la pose accroupie
+function doCrouchJump() {
+    STATE.posture   = 'stand';
+    STATE.walkToggle = false;
+    doJump(0.25); // blend 3× plus long → masque la pose accroupie de départ
+}
+
+// Crawl + Espace : saut direct depuis la position allongée
+// Blend long (0.35) pour masquer la transition prone → jump_start
+function doCrawlJump() {
+    STATE.posture    = 'stand';
+    STATE.walkToggle = false;
+    doJump(0.35);
+}
+
+// 6 pieds = 1.8288 m — seuil au-delà duquel l'animation jump_land est jouée
+const HARD_LAND_HEIGHT = 1.83;
+
+function doLand() {
+    if (STATE.jumpPhase === 'land') return; // déjà en atterrissage
+
+    // jump_land seulement si le saut était intentionnel ('start' ou 'loop')
+    // et non en sprint (évite le freeze sur mini-bosses de terrain)
+    // Note : depuis une plateforme haute, on peut atterrir avant que jump_start
+    // n'ait transitionné vers 'loop' — les deux phases comptent comme jump valide.
+    const wasJumping = STATE.jumpPhase === 'loop' || STATE.jumpPhase === 'start';
+    const isSprinting = STATE.sprintState === 'on' || STATE.sprintState === 'enter';
+
+    STATE.jumpPhase = 'land';
+    idleVarActive = false;
+
+    const fallHeight = STATE.launchY - STATE.pos.y; // positif = chute vers le bas
+
+    if (fallHeight >= HARD_LAND_HEIGHT && wasJumping && !isSprinting) {
+        // Chute de plus de 6 pieds depuis un saut → animation d'atterrissage + lock
+        playAnim('jump_land', 0.05, () => {
+            STATE.jumpPhase = '';
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.2);
+        });
+        STATE.oneShotLock = true;
+    } else {
+        // Saut normal / chute de bord / sprint → retour immédiat, pas de lock
+        STATE.jumpPhase = '';
+        // En sprint, resolveAnim reprend le sprint — pas besoin de forcer idle
+        if (!isSprinting) playAnim('idle', 0.15);
+    }
+}
+
+// ── Safety Vault ─────────────────────────────────────────────
+function doVault(wallHit) {
+    if (STATE.oneShotLock) return;
+    idleVarActive = false;
+    // Impulsion : passer par dessus (distance ≈ 1.2m vers l'avant)
+    const moveYaw = getMovementYaw();
+    STATE.pos.x -= Math.sin(moveYaw) * 1.2;
+    STATE.pos.z -= Math.cos(moveYaw) * 1.2;
+    playAnim('safety_vault', 0.06, () => {
+        STATE.oneShotLock = false;
+        playAnim('idle', 0.25);
+    });
+    STATE.oneShotLock = true;
+    showNotif('Safety Vault');
+}
+
+// ── Roulade ───────────────────────────────────────────────────
+function doRoll() {
+    if (STATE.oneShotLock) return;
+    STATE.stamina     = Math.max(0, STATE.stamina - 15);
+    STATE.sprintState = 'off'; // évite que _exitSprint() interrompe la roulade
+    // Mouvement progressif sur la durée de l'animation (pas d'offset instantané)
+    STATE.rolling  = true;
+    STATE.rollTime = 0;
+    STATE.rollDir  = new THREE.Vector3(Math.sin(STATE.yaw), 0, Math.cos(STATE.yaw));
+    idleVarActive  = false;
+    playAnim('roll', 0.08, () => {
+        STATE.rolling     = false;
+        STATE.oneShotLock = false;
+        // resolveAnim prend le relais dès le prochain frame :
+        // → jog direct si WASD maintenu, idle sinon
+    });
+    STATE.oneShotLock = true;
+    showNotif('Roulade');
+}
+
+// ── Esquive ───────────────────────────────────────────────────
+function doDodge(dir) {
+    if (STATE.oneShotLock) return;
+    STATE.stamina     = Math.max(0, STATE.stamina - 10);
+    STATE.sprintState = 'off'; // même protection que doRoll
+    const sign = dir === 'left' ? -1 : 1;
+    // Mouvement progressif sur la durée de l'animation (pas d'offset instantané)
+    STATE.dodging   = true;
+    STATE.dodgeTime = 0;
+    STATE.dodgeDir  = new THREE.Vector3(Math.cos(STATE.yaw) * sign, 0, -Math.sin(STATE.yaw) * sign);
+    idleVarActive   = false;
+    const animName  = dir === 'left' ? 'dodge_left' : 'dodge_right';
+    playAnim(animName, 0.08, () => {
+        STATE.dodging     = false;
+        STATE.oneShotLock = false;
+        playAnim('idle', 0.2);
+    });
+    STATE.oneShotLock = true;
+}
+
+// ── Slide ─────────────────────────────────────────────────────
+function startSlide() {
+    STATE.sprintState = 'off';
+    setTraversal('slide');
+    STATE.slideTimer = 0;
+    STATE.slideDir = new THREE.Vector3(Math.sin(STATE.yaw), 0, Math.cos(STATE.yaw));
+    STATE.stamina  = Math.max(0, STATE.stamina - 20);
+    // Pas de oneShotLock — la physique de glissade démarre immédiatement.
+    // slide_start est un blend cosmétique depuis sprint (0.1s) → slide_loop.
+    playAnim('slide_start', 0.1, () => playAnim('slide_loop', 0.15));
+    showNotif('Slide');
+}
+
+function updateSlide(delta) {
+    STATE.slideTimer += delta;
+    const spd = Math.max(0, SPRINT_SPD * (1 - STATE.slideTimer / 1.2));
+    if (STATE.slideDir) {
+        STATE.pos.x += STATE.slideDir.x * spd * delta;
+        STATE.pos.z += STATE.slideDir.z * spd * delta;
+    }
+    // Physique verticale pendant slide
+    const groundY = getGroundY(STATE.pos.x, STATE.pos.z, STATE.pos.y + 3);
+    if (!STATE.grounded) { STATE.vy -= GRAVITY * delta; STATE.pos.y += STATE.vy * delta; }
+    if (STATE.pos.y <= groundY) { STATE.pos.y = groundY; STATE.vy = 0; STATE.grounded = true; }
+
+    if (STATE.slideTimer >= 1.2 || spd < 0.5) {
+        setTraversal('');
+        STATE.posture = 'stand';
+        // Kip-up : ressort du sol en un mouvement → retour debout dynamique
+        playAnim('kip_up', 0.12, () => {
+            STATE.oneShotLock = false;
+            playAnim('idle', 0.2);
+        });
+        STATE.oneShotLock = true;
+    }
+}
+
+// ── Grimpe ────────────────────────────────────────────────────
+function enterClimb(hit) {
+    setTraversal('climb');
+    idleVarActive = false;
+
+    // Normale en espace monde, composante Y ignorée (mur vertical pur)
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    n.y = 0;
+    n.normalize();
+    STATE.climbWallNormal.copy(n);
+    STATE.climbWallPos.copy(hit.point);
+
+    // Coller au mur à distance fixe + ajuster Y au sol de départ
+    STATE.pos.x = hit.point.x + n.x * 0.45;
+    STATE.pos.z = hit.point.z + n.z * 0.45;
+    STATE.grounded = false;
+    STATE.vy = 0;
+
+    // Orienter le personnage face au mur
+    STATE.yawTarget = Math.atan2(-n.x, -n.z);
+    STATE.yaw       = STATE.yawTarget;
+
+    playAnim('climb_enter', 0.1, () => {
+        STATE.oneShotLock = false;
+        playAnim('climb_idle', 0.1);
+    });
+    STATE.oneShotLock = true;
+    showNotif('Grimpe — W/S : haut/bas | A/D : latéral | F/Espace : sortir par le haut');
+}
+
+function updateClimbing(delta, fwd, bck, lft, rgt, spaceJust, fJust) {
+    const WALL_DIST = 0.45;
+    const toWall = new THREE.Vector3(
+        -STATE.climbWallNormal.x, 0, -STATE.climbWallNormal.z
+    ).normalize();
+
+    // ── 1. Trouver le mur (hauteur poitrine) ─────────────────────
+    const wallRay = new THREE.Raycaster(
+        new THREE.Vector3(STATE.pos.x, STATE.pos.y + 1.0, STATE.pos.z),
+        toWall, 0, 1.8
+    );
+    const wallHits = wallRay.intersectObjects([...solidMeshes, ...climbableMeshes], false);
+    const wallHit  = wallHits.length ? wallHits[0] : null;
+
+    if (!wallHit) {
+        if (!STATE.oneShotLock) exitClimb();
+        return;
+    }
+
+    // ── 2. Mettre à jour normale + snap au mur chaque frame ──────
+    const n = wallHit.face.normal.clone().transformDirection(wallHit.object.matrixWorld);
+    n.y = 0; n.normalize();
+    STATE.climbWallNormal.copy(n);
+    STATE.pos.x = wallHit.point.x + n.x * WALL_DIST;
+    STATE.pos.z = wallHit.point.z + n.z * WALL_DIST;
+
+    if (STATE.oneShotLock) return;
+
+    // ── 3. Détection du sommet via Box3 (fiable) ─────────────────
+    //    On lit le Y max réel du mesh — pas de double-rayon fragile.
+    const wallBox   = new THREE.Box3().setFromObject(wallHit.object);
+    const distToTop = wallBox.max.y - STATE.pos.y;  // distance pieds → sommet mur
+    const atTop     = distToTop < 1.8;              // tête au niveau du rebord
+
+    // Ledge : auto si W + sommet proche, ou manuel avec F / Espace
+    if ((fwd && atTop) || spaceJust || fJust) {
+        _doLedgeClimb(n, wallBox.max.y);
+        return;
+    }
+
+    // ── 4. Mouvements sur le mur ─────────────────────────────────
+    if (fwd) {
+        STATE.pos.y += CLIMB_SPD * delta;
+        playAnim('climb_up', 0.1);
+    } else if (bck) {
+        if (STATE.pos.y <= getGroundY(STATE.pos.x, STATE.pos.z) + 0.8) {
+            exitClimb(); return;
+        }
+        STATE.pos.y -= CLIMB_SPD * delta;
+        playAnim('climb_down', 0.1);
+    } else if (lft || rgt) {
+        const right = new THREE.Vector3().crossVectors(n, _up).normalize();
+        const side  = rgt ? 1 : -1;
+        const tryX  = STATE.pos.x + right.x * side * CLIMB_SPD * delta;
+        const tryZ  = STATE.pos.z + right.z * side * CLIMB_SPD * delta;
+        const sideRay = new THREE.Raycaster(
+            new THREE.Vector3(tryX, STATE.pos.y + 1.0, tryZ), toWall, 0, 1.8
+        );
+        const sideHits = sideRay.intersectObjects([...solidMeshes, ...climbableMeshes], false);
+        if (sideHits.length) {
+            STATE.pos.x = sideHits[0].point.x + n.x * WALL_DIST;
+            STATE.pos.z = sideHits[0].point.z + n.z * WALL_DIST;
+        }
+        playAnim(lft ? 'climb_left' : 'climb_right', 0.1);
+    } else {
+        playAnim('climb_idle', 0.15);
+    }
+}
+
+function _doLedgeClimb(n, wallTopY) {
+    // Position d'atterrissage : par-dessus le mur, légèrement en avant
+    const overX = STATE.pos.x - n.x * 1.0;
+    const overZ = STATE.pos.z - n.z * 1.0;
+
+    // Chercher la surface au-dessus du mur pour le Y exact d'atterrissage
+    const downRay = new THREE.Raycaster(
+        new THREE.Vector3(overX, wallTopY + 1.5, overZ),
+        new THREE.Vector3(0, -1, 0), 0, 3.0
+    );
+    const landHits = downRay.intersectObjects(_allGeo, false);
+    const landY    = landHits.length ? landHits[0].point.y : wallTopY;
+
+    setTraversal('');
+    STATE.oneShotLock = true;
+    playAnim('climb_ledge', 0.1, () => {
+        STATE.oneShotLock = false;
+        STATE.pos.x   = overX;
+        STATE.pos.z   = overZ;
+        STATE.pos.y   = landY;
+        STATE.grounded = true;
+        playAnim('idle', 0.3);
+    });
+}
+
+function exitClimb() {
+    setTraversal('');
+    STATE.vy = 0;
+    playAnim('climb_exit', 0.1, () => {
+        STATE.oneShotLock = false;
+        playAnim('idle', 0.2);
+    });
+    STATE.oneShotLock = true;
+}
+
+// ── Nage ──────────────────────────────────────────────────────
+function updateSwimming(delta, fwd, bck, lft, rgt, shift) {
+    if (STATE.traversal !== 'swim') {
+        setTraversal('swim');
+        STATE.vy = 0;
+        showNotif('Nage — WASD déplacer | Espace remonter');
+    }
+    const camYaw = getMovementYaw();
+    _flatFwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+    _flatRight.set(Math.cos(camYaw), 0, -Math.sin(camYaw));
+    _moveDir.set(0,0,0);
+    if (fwd) _moveDir.addScaledVector(_flatFwd, 1);
+    if (bck) _moveDir.addScaledVector(_flatFwd,-1);
+    if (rgt) _moveDir.addScaledVector(_flatRight, 1);
+    if (lft) _moveDir.addScaledVector(_flatRight,-1);
+    if (_moveDir.lengthSq() > 0.001) {
+        _moveDir.normalize();
+        STATE.pos.x += _moveDir.x * SWIM_SPD * delta;
+        STATE.pos.z += _moveDir.z * SWIM_SPD * delta;
+        STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
+        playAnim('swim_fwd', 0.15);
+    } else {
+        playAnim('swim_idle', 0.15);
+    }
+    // Gravité amortie dans l'eau
+    STATE.vy -= 3 * delta;
+    const wz = isInWater(STATE.pos.x, STATE.pos.z);
+    const waterY = wz ? wz.y : 0;
+    if (STATE.pos.y < waterY - 1.5) STATE.pos.y = waterY - 1.5;
+    if (keys.has('Space')) { STATE.pos.y = Math.min(STATE.pos.y + SWIM_SPD * delta, waterY); STATE.vy = 0; }
+    STATE.pos.y += STATE.vy * delta;
+}
+
+// ── Interagir ─────────────────────────────────────────────────
+function doInteract() {
+    if (STATE.oneShotLock) return;
+    playAnim('interact', 0.1, () => {
+        STATE.oneShotLock = false;
+        playAnim('idle', 0.3);
+    });
+    STATE.oneShotLock = true;
+    showNotif('Interagir');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODE COMBAT
+// ═══════════════════════════════════════════════════════════════
+const COMBAT_NAMES = ['Aucun','Épée','Poings','Magie','Arc','Hache','Couteau','Pioche','Torche'];
+const COMBAT_ICONS = ['—','⚔','👊','✨','🏹','🪓','🗡','⛏','🔦'];
+let attackCooldown = 0;
+let comboStep = 0;
+let comboTimer = 0;
+let toolLoopActive = false;  // hache (chop) ou pioche (mining) — toggle par clic gauche
+
+function setCombatMode(mode) {
+    if (mode === 0) {
+        // Désarmer complètement : retirer les armes de la main + quitter la stance
+        _clearSlot('R');
+        _clearSlot('L');
+        STATE.hasShield = false;
+        _refreshWeaponUI();
+        _hideGripEditor();
+        exitCombatStance();
+        STATE.combatMode = 0;
+        document.getElementById('dbg-combat').textContent = 'Aucun';
+        document.getElementById('combat-mode').textContent = '—';
+        showNotif('Désarmé');
+        return;
+    }
+
+    if (STATE.combatMode === mode) {
+        // Même mode : toggle (quitter la stance sans retirer l'arme)
+        if (STATE.inCombatStance) exitCombatStance();
+        return;
+    }
+
+    STATE.combatMode = mode;
+    document.getElementById('dbg-combat').textContent = COMBAT_NAMES[mode] || '';
+    document.getElementById('combat-mode').textContent = COMBAT_ICONS[mode] + ' ' + COMBAT_NAMES[mode];
+    enterCombatStance();
+    showNotif(COMBAT_ICONS[mode] + ' ' + COMBAT_NAMES[mode]);
+}
+
+function enterCombatStance() {
+    STATE.inCombatStance = true;
+    comboStep = 0; comboTimer = 0; attackCooldown = 0;
+    const enterAnim = STATE.combatMode === 1 ? 'sword_enter'
+        : STATE.combatMode === 3 ? 'spell_enter'
+        : STATE.combatMode === 4 ? 'bow_notch'
+        : null;
+    if (enterAnim) {
+        playAnim(enterAnim, 0.1, () => {
+            STATE.oneShotLock = false;
+            playAnim(getCombatIdleAnim(), 0.2);
+        });
+        STATE.oneShotLock = true;
+    } else {
+        playAnim(getCombatIdleAnim(), 0.25);
+    }
+    showNotif(COMBAT_ICONS[STATE.combatMode] + ' ' + COMBAT_NAMES[STATE.combatMode]);
+}
+
+function exitCombatStance() {
+    if (!STATE.inCombatStance) return;
+    STATE.inCombatStance = false;
+    toolLoopActive = false;
+    const exitAnim = STATE.combatMode === 1 ? 'sword_exit'
+        : STATE.combatMode === 3 ? 'spell_exit'
+        : null;
+    if (exitAnim) {
+        playAnim(exitAnim, 0.1, () => { STATE.oneShotLock = false; playAnim('idle', 0.2); });
+        STATE.oneShotLock = true;
+    } else {
+        playAnim('idle', 0.25);
+    }
+}
+
+function getCombatIdleAnim() {
+    switch (STATE.combatMode) {
+        case 1: return 'sword_idle';
+        case 2: return 'idle';
+        case 3: return 'spell_idle';
+        case 4: return 'bow_idle';
+        case 5: return 'idle';        // Hache — debout, outil à côté
+        case 6: return 'sword_idle';  // Couteau — garde basse (même pose, arme différente)
+        case 7: return 'idle';        // Pioche — debout
+        case 8: return 'idle_torch';  // Torche — torche levée
+        default: return 'idle';
+    }
+}
+
+let kickCooldown = 0;
+
+function doKick() {
+    if (STATE.oneShotLock || kickCooldown > 0 || !STATE.grounded) return;
+    // Désarmer la main droite automatiquement (kick = corps à corps pur)
+    if (equippedR) {
+        _clearSlot('R');
+        _applyWeaponCombatMode();
+        _refreshWeaponUI();
+    }
+    kickCooldown = 0.9;
+    const kickBtn = document.getElementById('kick-btn');
+    if (kickBtn) kickBtn.classList.add('cooldown');
+    STATE.oneShotLock = true;
+    playAnim('kick', 0.12, () => {
+        STATE.oneShotLock = false;
+        playAnim(getCombatIdleAnim(), 0.2);
+        if (kickBtn) kickBtn.classList.remove('cooldown');
+    });
+}
+
+function updateCombat(delta, atkJust, blockJust) {
+    attackCooldown -= delta;
+    comboTimer     -= delta;
+    if (comboTimer < 0) comboStep = 0;
+
+    // Blocage / viser
+    if (blockJust && !STATE.oneShotLock) {
+        if (STATE.combatMode === 1 || STATE.hasShield ||
+            STATE.combatMode === 5 || STATE.combatMode === 6) {
+            // Épée, bouclier, hache, couteau → parade
+            playAnim('sword_block', 0.1);
+            STATE.blocking = true;
+        } else if (STATE.combatMode === 3) {
+            playAnim('spell2_idle', 0.15);
+        } else if (STATE.combatMode === 4) {
+            // Arc : clic droit = cycle aim up → neutral → down
+            const aim = activeClip === 'bow_idle'    ? 'bow_aim_u'
+                      : activeClip === 'bow_aim_u'   ? 'bow_aim_d'
+                      : 'bow_idle';
+            playAnim(aim, 0.12);
+        }
+    }
+
+    // ── Modes outils : toggle clic gauche (hache / pioche) ────────
+    if (STATE.combatMode === 5 || STATE.combatMode === 7) {
+        if (atkJust && !STATE.oneShotLock) {
+            if (!toolLoopActive) {
+                toolLoopActive = true;
+                playAnim(STATE.combatMode === 5 ? 'chop' : 'mining', 0.2);
+            } else {
+                toolLoopActive = false;
+                playAnim('idle', 0.3);
+            }
+        }
+        return;
+    }
+
+    // Mode torche — aucun combat
+    if (STATE.combatMode === 8) return;
+
+    // Attaque
+    if (!atkJust || attackCooldown > 0 || STATE.oneShotLock) return;
+
+    let atkAnim, returnTo, cd;
+    switch (STATE.combatMode) {
+        case 1: // Épée — combo 3 coups
+            comboTimer = 1.2;
+            if (comboStep === 0)      { atkAnim = 'sword_a';    returnTo = 'sword_idle'; cd = 0.5; }
+            else if (comboStep === 1) { atkAnim = 'sword_b';    returnTo = 'sword_idle'; cd = 0.5; }
+            else                      { atkAnim = 'sword_combo'; returnTo = 'sword_idle'; cd = 0.8; comboStep = -1; }
+            comboStep++;
+            break;
+        case 2: // Poings — jab/cross/kick rotation
+            if (comboStep % 3 === 0)      atkAnim = 'punch_jab';
+            else if (comboStep % 3 === 1) atkAnim = 'punch_cross';
+            else                          atkAnim = 'kick';
+            returnTo = 'idle'; cd = 0.35; comboStep++;
+            break;
+        case 3: // Magie
+            atkAnim = activeClip === 'spell2_idle' ? 'spell2_shoot' : 'spell_shoot';
+            returnTo = getCombatIdleAnim(); cd = 0.7;
+            break;
+        case 4: // Arc — tire depuis la position visée actuelle
+            atkAnim = 'bow_shoot';
+            returnTo = activeClip === 'bow_aim_u' ? 'bow_aim_u'
+                     : activeClip === 'bow_aim_d' ? 'bow_aim_d'
+                     : 'bow_idle';
+            cd = 0.9;
+            break;
+        case 6: // Couteau — stabs rapides : jab → knee → hook rotation
+            comboTimer = 0.8;
+            if (comboStep % 3 === 0)      atkAnim = 'punch_jab';
+            else if (comboStep % 3 === 1) atkAnim = 'melee_knee';
+            else                          atkAnim = 'hook';
+            returnTo = 'sword_idle'; cd = 0.28; comboStep++;
+            break;
+        default: return;
+    }
+
+    attackCooldown = cd;
+    playAnim(atkAnim, 0.06, () => {
+        STATE.oneShotLock = false;
+        playAnim(returnTo, 0.2);
+    });
+    STATE.oneShotLock = true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MISE À JOUR DU MESH GLB
+// ═══════════════════════════════════════════════════════════════
+const _footWP = new THREE.Vector3();
+
+function updateCharMesh(delta) {
+    if (!charRoot) return;
+
+    // 1. Position initiale (yOffset calculé sur la T-pose debout)
+    charRoot.position.set(STATE.pos.x, STATE.pos.y + yOffset, STATE.pos.z);
+
+    // 2. Orientation — yaw pur
+    _yawQ.setFromAxisAngle(_up, STATE.yaw);
+    charRoot.quaternion.slerp(_yawQ, Math.min(1, 12 * delta));
+
+    // 3. Animer + bone scaling
+    mixer.update(delta);
+    if (Object.keys(boneOverrides).length) {
+        applyIsolatedScales(charRoot, boneOverrides, boneRestPos);
+    }
+
+    // 4. Correction sol dynamique
+    //
+    //    En 'stand' sans transition : yOffset (T-pose) est déjà exact → pas de correction.
+    //
+    //    En 'crouch' ou 'crawl' ET pendant leurs animations de sortie (crouch_exit /
+    //    crawl_exit), STATE.posture est déjà 'stand' mais le personnage n'est pas encore
+    //    debout → on continue la correction jusqu'à la fin de l'animation.
+    //
+    //    Logique par anim de référence :
+    //      • crouch / crouch_exit → os cheville (foot_l/r) + 0.06 (semelle)
+    //      • crawl  / crawl_exit  → ensemble membres bas (tibia, cuisse, bras, pelvis)
+    //                               + 0.04 (surface mesh vs centre os)
+    // Décrémenter le timer de blend crawl ↔ crouch
+    if (STATE.postureBlendTimer > 0) STATE.postureBlendTimer -= delta;
+
+    // ── Correction sol universelle ────────────────────────────────
+    //
+    //  Principe : TOUJOURS corriger quand grounded, peu importe l'animation.
+    //  On mesure la position monde des bones de contact APRÈS mixer.update(),
+    //  et on ajuste charRoot.position.y pour que le point le plus bas
+    //  reste exactement au niveau du sol (STATE.pos.y).
+    //
+    //  3 modes selon la pose :
+    //   1. Crawl / blend crawl↔crouch  → ensemble membres (mains+genoux+pieds) + 0.04
+    //   2. Anims au sol (kip_up/roll/dodge) → membres inférieurs + offset calibré
+    //   3. TOUT LE RESTE (stand, combat, idle, sprint, emotes…) → foot_l/r + 0.06
+    //
+    if (STATE.grounded) {
+        charRoot.updateMatrixWorld(true);
+        let minY = Infinity;
+
+        const _useCrawlLogic = (STATE.posture === 'crawl')
+            || (activeClip === 'crawl_exit')
+            || (STATE.postureBlendTimer > 0);
+
+        const _useGroundLogic = (activeClip === 'kip_up'     ||
+                                  activeClip === 'roll'        ||
+                                  activeClip === 'dodge_left'  ||
+                                  activeClip === 'dodge_right');
+
+        if (_useCrawlLogic) {
+            // Contact = membres proches du sol en position allongée
+            const CRAWL_CONTACT = new Set([
+                'calf_l','calf_r','thigh_l','thigh_r',
+                'lowerarm_l','lowerarm_r','hand_l','hand_r',
+                'pelvis','foot_l','foot_r',
+            ]);
+            charRoot.traverse(n => {
+                if (n.isBone && CRAWL_CONTACT.has(n.name)) {
+                    n.getWorldPosition(_footWP);
+                    if (_footWP.y < minY) minY = _footWP.y;
+                }
+            });
+            if (isFinite(minY)) charRoot.position.y += STATE.pos.y - minY + 0.04;
+
+        } else if (_useGroundLogic) {
+            // Contact = membres inférieurs (corps au sol) + offset calibré par anim
+            const GROUND_CONTACT = new Set([
+                'calf_l','calf_r','thigh_l','thigh_r',
+                'pelvis','foot_l','foot_r',
+            ]);
+            charRoot.traverse(n => {
+                if (n.isBone && GROUND_CONTACT.has(n.name)) {
+                    n.getWorldPosition(_footWP);
+                    if (_footWP.y < minY) minY = _footWP.y;
+                }
+            });
+            const _gOff = (activeClip === 'kip_up') ? 0.14 : 0.12;
+            if (isFinite(minY)) charRoot.position.y += STATE.pos.y - minY + _gOff;
+
+        } else {
+            // UNIVERSEL — couvre idle, combat, sprint, émotes, transitions, etc.
+            // Mesure les deux chevilles → point de contact le plus bas → ajuste
+            charRoot.traverse(n => {
+                if (n.isBone && (n.name === 'foot_l' || n.name === 'foot_r')) {
+                    n.getWorldPosition(_footWP);
+                    if (_footWP.y < minY) minY = _footWP.y;
+                }
+            });
+            if (isFinite(minY)) charRoot.position.y += STATE.pos.y - minY + 0.06;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HUD — mise à jour chaque frame
+// ═══════════════════════════════════════════════════════════════
+let _hudTimer = 0;
+function updateHUD(delta) {
+    _hudTimer += delta;
+    if (_hudTimer < 0.05) return;
+    _hudTimer = 0;
+
+    document.getElementById('stamina-bar').style.width = STATE.stamina + '%';
+    const _sprint = STATE.wasSprintingLast;
+    document.getElementById('dbg-phys').textContent =
+        getLocoLabel(_sprint) + ' | ' + (STATE.grounded ? 'Sol' : 'Aérien');
+    document.getElementById('dbg-pos').textContent =
+        STATE.pos.x.toFixed(1) + ', ' + STATE.pos.y.toFixed(1) + ', ' + STATE.pos.z.toFixed(1);
+
+    // Notification fade
+    if (_notifTimer > 0) {
+        _notifTimer -= 0.05;
+        if (_notifTimer <= 0) document.getElementById('notif').style.opacity = '0';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOUCLE PRINCIPALE
+// ═══════════════════════════════════════════════════════════════
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = Math.min(clock.getDelta(), 0.05);
+
+    if (charRoot) {
+        update(delta);
+        updateCharMesh(delta);
+    }
+    updateCamera(delta);
+    updateHUD(delta);
+    renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+buildEmoteWheel();
+
+(async () => {
+    try {
+        setLoadProgress(5);
+        const cfg = resolveCharConfig();
+        setLoadSub('Config : ' + cfg.name);
+        await loadCharacter(cfg);
+        setLoadProgress(100);
+        setLoadSub('Prêt !');
+        await new Promise(r => setTimeout(r, 600));
+        document.getElementById('loading').style.display = 'none';
+        showNotif('Bienvenue, ' + cfg.name + ' — G pour les émotes');
+    } catch(e) {
+        console.error(e);
+        setLoadSub('Erreur chargement : ' + e.message);
+    }
+    animate();
+})();
+</script>
+</body>
+</html>

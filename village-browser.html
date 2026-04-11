@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Medieval Village — Browser</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+/* ── Panneau gauche ─────────────────────────────────────────── */
+#sidebar {
+    width:240px; flex-shrink:0; background:#0a0c0e;
+    border-right:1px solid rgba(200,184,154,0.1);
+    display:flex; flex-direction:column; overflow:hidden;
+}
+#search {
+    background:rgba(200,184,154,0.06); border:none;
+    border-bottom:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:12px 14px; font-family:'Georgia',serif;
+    font-size:11px; letter-spacing:1px; outline:none; width:100%;
+}
+#search::placeholder { color:rgba(200,184,154,0.25); }
+
+#categories { display:flex; flex-wrap:wrap; gap:4px; padding:8px; border-bottom:1px solid rgba(200,184,154,0.08); }
+.cat-btn {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); padding:3px 8px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s; text-transform:uppercase;
+}
+.cat-btn:hover, .cat-btn.active { background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4); }
+
+#list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.item {
+    padding:8px 14px; font-size:10px; letter-spacing:0.5px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.item:hover  { background:rgba(200,184,154,0.08); }
+.item.active { background:rgba(200,184,154,0.15); color:#fff; }
+
+#count { padding:8px 14px; font-size:9px; letter-spacing:2px; color:rgba(200,184,154,0.25); border-top:1px solid rgba(200,184,154,0.08); }
+
+/* ── Vue 3D ─────────────────────────────────────────────────── */
+#viewport { flex:1; position:relative; }
+#viewport canvas { display:block; width:100% !important; height:100% !important; }
+
+#obj-name {
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.5); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; pointer-events:none; text-align:center;
+}
+#hint {
+    position:absolute; bottom:16px; right:16px;
+    color:rgba(200,184,154,0.2); font-size:9px; letter-spacing:1px;
+    line-height:2; text-align:right; pointer-events:none;
+}
+#loading-overlay {
+    position:absolute; inset:0; background:rgba(13,15,18,0.7);
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(200,184,154,0.4); font-size:11px; letter-spacing:3px;
+    pointer-events:none; opacity:0; transition:opacity 0.2s;
+}
+#loading-overlay.visible { opacity:1; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+    <input id="search" type="text" placeholder="Rechercher...">
+    <div id="categories"></div>
+    <div id="list"></div>
+    <div id="count"></div>
+</div>
+
+<!-- Vue 3D -->
+<div id="viewport">
+    <div id="obj-name">—</div>
+    <div id="loading-overlay">Chargement...</div>
+    <div id="hint">Clic droit + drag : orbiter<br>Molette : zoom<br>Clic gauche + drag : panoramique</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── Liste complète des objets ────────────────────────────────────
+const BASE = 'Medieval Village MegaKit[Standard]/glTF/';
+const OBJECTS = [
+    'Balcony_Cross_Corner','Balcony_Cross_Straight','Balcony_Simple_Corner','Balcony_Simple_Straight',
+    'Corner_ExteriorWide_Brick','Corner_ExteriorWide_Wood','Corner_Exterior_Brick','Corner_Exterior_TopDown',
+    'Corner_Exterior_TopOnly','Corner_Exterior_Wood','Corner_Interior_Big','Corner_Interior_Small',
+    'DoorFrame_Flat_Brick','DoorFrame_Flat_WoodDark','DoorFrame_Round_Brick','DoorFrame_Round_WoodDark',
+    'Door_1_Flat','Door_1_Round','Door_2_Flat','Door_2_Round','Door_4_Flat','Door_4_Round','Door_8_Flat','Door_8_Round',
+    'Floor_Brick','Floor_RedBrick','Floor_UnevenBrick','Floor_WoodDark','Floor_WoodDark_Half1',
+    'Floor_WoodDark_Half2','Floor_WoodDark_Half3','Floor_WoodDark_OverhangCorner','Floor_WoodDark_OverhangCorner2',
+    'Floor_WoodLight','Floor_WoodLight_OverhangCorner','Floor_WoodLight_OverhangCorner2',
+    'HoleCover_90Angle','HoleCover_90Half','HoleCover_90Stairs','HoleCover_Straight','HoleCover_StraightHalf',
+    'Overhang_Plaster_Corner','Overhang_Plaster_Corner_Front','Overhang_Plaster_Long','Overhang_Plaster_Short',
+    'Overhang_RoofIncline_Plaster','Overhang_RoofIncline_UnevenBricks','Overhang_Roof_Plaster','Overhang_Roof_UnevenBricks',
+    'Overhang_Side_Plaster_Long_L','Overhang_Side_Plaster_Long_R','Overhang_Side_Plaster_Short_L','Overhang_Side_Plaster_Short_R',
+    'Overhang_Side_UnevenBrick_Long_L','Overhang_Side_UnevenBrick_Long_R','Overhang_Side_UnevenBrick_Short_L','Overhang_Side_UnevenBrick_Short_R',
+    'Overhang_UnevenBrick_Corner','Overhang_UnevenBrick_Corner_Front','Overhang_UnevenBrick_Long','Overhang_UnevenBrick_Short',
+    'Prop_Brick1','Prop_Brick2','Prop_Brick3','Prop_Brick4','Prop_Chimney','Prop_Chimney2','Prop_Crate',
+    'Prop_ExteriorBorder_Corner','Prop_ExteriorBorder_Straight1','Prop_ExteriorBorder_Straight2',
+    'Prop_MetalFence_Ornament','Prop_MetalFence_Simple','Prop_Support',
+    'Prop_Vine1','Prop_Vine2','Prop_Vine4','Prop_Vine5','Prop_Vine6','Prop_Vine9',
+    'Prop_Wagon','Prop_WoodenFence_Extension1','Prop_WoodenFence_Extension2','Prop_WoodenFence_Single',
+    'Roof_2x4_RoundTile','Roof_Dormer_RoundTile','Roof_FrontSupports',
+    'Roof_Front_Brick2','Roof_Front_Brick4','Roof_Front_Brick4_Half_L','Roof_Front_Brick4_Half_R',
+    'Roof_Front_Brick6','Roof_Front_Brick6_Half_L','Roof_Front_Brick6_Half_R',
+    'Roof_Front_Brick8','Roof_Front_Brick8_Half_L','Roof_Front_Brick8_Half_R',
+    'Roof_Log','Roof_Modular_RoundTiles','Roof_RoundTile_2x1','Roof_RoundTile_2x1_Long',
+    'Roof_RoundTiles_4x4','Roof_RoundTiles_4x6','Roof_RoundTiles_4x8',
+    'Roof_RoundTiles_6x10','Roof_RoundTiles_6x12','Roof_RoundTiles_6x14',
+    'Roof_RoundTiles_6x4','Roof_RoundTiles_6x6','Roof_RoundTiles_6x8',
+    'Roof_RoundTiles_8x10','Roof_RoundTiles_8x12','Roof_RoundTiles_8x14','Roof_RoundTiles_8x8',
+    'Roof_Support2','Roof_Tower_RoundTiles',
+    'Roof_Wooden_2x1','Roof_Wooden_2x1_Center','Roof_Wooden_2x1_Center_Mirror',
+    'Roof_Wooden_2x1_Corner','Roof_Wooden_2x1_L','Roof_Wooden_2x1_Middle','Roof_Wooden_2x1_R',
+    'Stair_Interior_Rails','Stair_Interior_Simple','Stair_Interior_Solid','Stair_Interior_SolidExtended',
+    'Stairs_Exterior_NoFirstStep','Stairs_Exterior_Platform','Stairs_Exterior_Platform45','Stairs_Exterior_Platform45Clean',
+    'Stairs_Exterior_PlatformU','Stairs_Exterior_SidePlatform','Stairs_Exterior_Sides','Stairs_Exterior_Sides45',
+    'Stairs_Exterior_SidesU','Stairs_Exterior_SingleSide','Stairs_Exterior_SingleSideThick',
+    'Stairs_Exterior_Straight','Stairs_Exterior_Straight_Center','Stairs_Exterior_Straight_L','Stairs_Exterior_Straight_R',
+    'Wall_Arch','Wall_BottomCover',
+    'Wall_Plaster_Door_Flat','Wall_Plaster_Door_Round','Wall_Plaster_Door_RoundInset',
+    'Wall_Plaster_Straight','Wall_Plaster_Straight_Base','Wall_Plaster_Straight_L','Wall_Plaster_Straight_R',
+    'Wall_Plaster_Window_Thin_Round','Wall_Plaster_Window_Wide_Flat','Wall_Plaster_Window_Wide_Flat2','Wall_Plaster_Window_Wide_Round',
+    'Wall_Plaster_WoodGrid',
+    'Wall_UnevenBrick_Door_Flat','Wall_UnevenBrick_Door_Round','Wall_UnevenBrick_Straight',
+    'Wall_UnevenBrick_Window_Thin_Round','Wall_UnevenBrick_Window_Wide_Flat','Wall_UnevenBrick_Window_Wide_Round',
+    'WindowShutters_Thin_Flat_Closed','WindowShutters_Thin_Flat_Open','WindowShutters_Thin_Round_Closed','WindowShutters_Thin_Round_Open',
+    'WindowShutters_Wide_Flat_Closed','WindowShutters_Wide_Flat_Open','WindowShutters_Wide_Round_Closed','WindowShutters_Wide_Round_Open',
+    'Window_Roof_Thin','Window_Roof_Wide','Window_Thin_Flat1','Window_Thin_Round1','Window_Wide_Flat1','Window_Wide_Round1',
+];
+
+const CATEGORIES = ['Tout','Balcony','Corner','Door','Floor','HoleCover','Overhang','Prop','Roof','Stair','Wall','Window'];
+
+// ── Scène ────────────────────────────────────────────────────────
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x13161a);
+scene.fog = new THREE.FogExp2(0x13161a, 0.06);
+
+const vp     = document.getElementById('viewport');
+const camera = new THREE.PerspectiveCamera(50, vp.clientWidth / vp.clientHeight, 0.01, 100);
+camera.position.set(2, 2, 3);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(vp.clientWidth, vp.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+vp.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+// Lumières
+scene.add(new THREE.AmbientLight(0xfff0d8, 1.0));
+const sun = new THREE.DirectionalLight(0xfff4d0, 3);
+sun.position.set(5, 8, 4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+const fillLV = new THREE.DirectionalLight(0x8090b0, 0.8);
+fillLV.position.set(-4, 3, -4);
+scene.add(fillLV);
+
+// Sol de référence (grille)
+const grid = new THREE.GridHelper(20, 20, 0x2a2418, 0x1a1610);
+scene.add(grid);
+
+// ── Chargement ───────────────────────────────────────────────────
+let current = null;
+const loader = new GLTFLoader();
+const overlay = document.getElementById('loading-overlay');
+
+function loadObject(name) {
+    overlay.classList.add('visible');
+    document.getElementById('obj-name').textContent = name;
+    document.querySelectorAll('.item').forEach(el => el.classList.toggle('active', el.dataset.name === name));
+
+    if (current) { scene.remove(current); current = null; }
+
+    loader.load(BASE + name + '.gltf', (gltf) => {
+        const obj = gltf.scene;
+        obj.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+
+        // Centrer + reposer sur le sol
+        const box = new THREE.Box3().setFromObject(obj);
+        const ctr = box.getCenter(new THREE.Vector3());
+        obj.position.sub(ctr);
+        obj.position.y -= box.min.y - ctr.y;
+
+        scene.add(obj);
+        current = obj;
+
+        // Ajuster la caméra
+        const size   = box.getSize(new THREE.Vector3()).length();
+        const dist   = size * 1.8;
+        controls.target.set(0, (box.max.y - box.min.y) * 0.4, 0);
+        camera.position.set(dist * 0.7, dist * 0.6, dist * 0.7);
+        controls.update();
+
+        overlay.classList.remove('visible');
+    }, undefined, (err) => {
+        overlay.classList.remove('visible');
+        console.error(err);
+    });
+}
+
+// ── UI ───────────────────────────────────────────────────────────
+let activeCat = 'Tout', searchTerm = '';
+
+// Catégories
+const catEl = document.getElementById('categories');
+CATEGORIES.forEach(cat => {
+    const btn = document.createElement('div');
+    btn.className = 'cat-btn' + (cat === 'Tout' ? ' active' : '');
+    btn.textContent = cat;
+    btn.addEventListener('click', () => {
+        activeCat = cat;
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderList();
+    });
+    catEl.appendChild(btn);
+});
+
+// Recherche
+document.getElementById('search').addEventListener('input', e => {
+    searchTerm = e.target.value.toLowerCase();
+    renderList();
+});
+
+// Liste
+function renderList() {
+    const filtered = OBJECTS.filter(name => {
+        const catMatch = activeCat === 'Tout' || name.startsWith(activeCat);
+        const srcMatch = name.toLowerCase().includes(searchTerm);
+        return catMatch && srcMatch;
+    });
+
+    const listEl = document.getElementById('list');
+    listEl.innerHTML = '';
+    filtered.forEach(name => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.dataset.name = name;
+        el.textContent = name;
+        el.addEventListener('click', () => loadObject(name));
+        listEl.appendChild(el);
+    });
+    document.getElementById('count').textContent = filtered.length + ' objets';
+}
+
+renderList();
+
+// Charger le premier par défaut
+loadObject('Wall_Plaster_Straight');
+
+// ── Boucle ───────────────────────────────────────────────────────
+(function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+    camera.aspect = vp.clientWidth / vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth, vp.clientHeight);
+});
+</script>
+</body>
+</html>

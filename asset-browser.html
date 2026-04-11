@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Asset Browser — RPG Dark Fantasy</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+/* ── Sidebar ── */
+#sidebar {
+    width:280px; flex-shrink:0; background:#080a0c;
+    border-right:1px solid rgba(200,184,154,0.08);
+    display:flex; flex-direction:column; overflow:hidden;
+}
+#sidebar-header {
+    padding:14px 14px 10px;
+    border-bottom:1px solid rgba(200,184,154,0.08);
+}
+#sidebar-title {
+    font-size:9px; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.35); margin-bottom:10px;
+}
+
+/* Tabs */
+#tabs { display:flex; gap:2px; }
+.tab {
+    flex:1; padding:7px 4px; font-size:9px; letter-spacing:1px;
+    text-transform:uppercase; text-align:center; cursor:pointer;
+    background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.1);
+    color:rgba(200,184,154,0.4); transition:all 0.12s;
+}
+.tab:hover  { background:rgba(200,184,154,0.08); color:rgba(200,184,154,0.7); }
+.tab.active { background:rgba(200,184,154,0.14); color:#c8b89a;
+              border-color:rgba(200,184,154,0.35); }
+
+/* Search */
+#search-wrap { padding:8px; border-bottom:1px solid rgba(200,184,154,0.06); }
+#search {
+    width:100%; background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:8px 10px; font-family:'Georgia',serif;
+    font-size:10px; letter-spacing:1px; outline:none;
+}
+#search::placeholder { color:rgba(200,184,154,0.2); }
+#search:focus { border-color:rgba(200,184,154,0.3); }
+
+/* Model list */
+#model-list { overflow-y:auto; max-height:40vh; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.model-item {
+    padding:8px 14px; font-size:10px; letter-spacing:0.5px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; display:flex; align-items:center; gap:8px;
+}
+.model-item:hover  { background:rgba(200,184,154,0.07); }
+.model-item.active { background:rgba(200,184,154,0.14); color:#fff; }
+.model-item .icon  { font-size:11px; opacity:0.5; flex-shrink:0; }
+#model-count {
+    padding:7px 14px; font-size:9px; letter-spacing:2px;
+    color:rgba(200,184,154,0.2); border-top:1px solid rgba(200,184,154,0.06);
+}
+
+/* ── Anim panel (bas de sidebar pour personnages) ── */
+#anim-panel {
+    border-top:1px solid rgba(200,184,154,0.08);
+    display:none; flex-direction:column; flex:1; min-height:0;
+}
+#anim-header {
+    padding:8px 14px; font-size:9px; letter-spacing:3px;
+    text-transform:uppercase; color:rgba(200,184,154,0.3);
+    display:flex; align-items:center; justify-content:space-between;
+}
+#ual-toggle { display:flex; gap:4px; }
+.ual-btn {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); padding:3px 8px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s;
+}
+.ual-btn:hover, .ual-btn.active {
+    background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4);
+}
+#anim-search {
+    background:rgba(200,184,154,0.04); border:none;
+    border-bottom:1px solid rgba(200,184,154,0.08);
+    color:#c8b89a; padding:7px 14px; font-family:'Georgia',serif;
+    font-size:10px; letter-spacing:1px; outline:none; width:100%;
+}
+#anim-search::placeholder { color:rgba(200,184,154,0.2); }
+#clip-list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.clip-item {
+    padding:6px 14px; font-size:10px; letter-spacing:0.3px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; display:flex; justify-content:space-between;
+}
+.clip-item:hover  { background:rgba(200,184,154,0.07); }
+.clip-item.active { background:rgba(200,184,154,0.14); color:#fff; }
+.clip-item .dur   { font-size:9px; opacity:0.3; }
+
+/* ── Viewport ── */
+#viewport { flex:1; position:relative; background:#111418; }
+#viewport canvas { display:block; width:100% !important; height:100% !important; }
+
+#vp-label {
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.5); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; pointer-events:none; text-align:center;
+    line-height:1.8; white-space:pre; text-shadow:0 1px 4px rgba(0,0,0,0.8);
+}
+#vp-hint {
+    position:absolute; bottom:16px; right:16px;
+    color:rgba(200,184,154,0.18); font-size:9px; letter-spacing:1px;
+    line-height:2; text-align:right; pointer-events:none;
+}
+#vp-loading {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(200,184,154,0.4); font-size:11px; letter-spacing:4px;
+    text-transform:uppercase; display:none;
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div id="sidebar">
+    <div id="sidebar-header">
+        <div id="sidebar-title">Asset Browser</div>
+        <div id="tabs">
+            <div class="tab active" data-cat="Personnages">Perso</div>
+            <div class="tab" data-cat="Cheveux">Cheveux</div>
+            <div class="tab" data-cat="Nature">Nature</div>
+            <div class="tab" data-cat="Bâtiments">Bâtim.</div>
+            <div class="tab" data-cat="Props">Props</div>
+        </div>
+    </div>
+    <div id="search-wrap">
+        <input id="search" type="text" placeholder="Filtrer...">
+    </div>
+    <div id="model-list"></div>
+    <div id="model-count">—</div>
+
+    <!-- Panel animations (personnages seulement) -->
+    <div id="anim-panel">
+        <div id="anim-header">
+            <span>Animations</span>
+            <div id="ual-toggle">
+                <div class="ual-btn" data-ual="1">UAL1</div>
+                <div class="ual-btn active" data-ual="2">UAL2</div>
+            </div>
+        </div>
+        <input id="anim-search" type="text" placeholder="Filtrer clips...">
+        <div id="clip-list"></div>
+    </div>
+</div>
+
+<!-- ── Viewport ── -->
+<div id="viewport">
+    <div id="vp-label">Sélectionne un asset</div>
+    <div id="vp-loading">Chargement...</div>
+    <div id="vp-hint">Clic droit : orbiter · Molette : zoom · Clic milieu : pan</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+// ═══════════════════════════════════════════════════════════════
+//  CATALOGUE D'ASSETS
+// ═══════════════════════════════════════════════════════════════
+const BASE_OUTFIT  = 'Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/';
+const BASE_HAIR    = 'Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/';
+const BASE_NATURE  = 'Nature Pack[Standard]/glTF/';
+const BASE_VILLAGE = 'Medieval Village MegaKit[Standard]/glTF/';
+const BASE_PROPS   = 'Fantasy Props MegaKit[Standard]/Exports/glTF/';
+const BASE_BODY_M  = 'Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf';
+const BASE_BODY_F  = 'Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Female_FullBody.gltf';
+const UAL_PATHS    = {
+    1: 'Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb',
+    2: 'Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb',
+};
+
+const CATALOG = {
+    'Personnages': [
+        { name:'Male Ranger',    src: BASE_OUTFIT+'Male_Ranger.gltf',    animated:true, bodyUrl: BASE_BODY_M },
+        { name:'Male Peasant',   src: BASE_OUTFIT+'Male_Peasant.gltf',   animated:true, bodyUrl: BASE_BODY_M },
+        { name:'Female Ranger',  src: BASE_OUTFIT+'Female_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_F },
+        { name:'Female Peasant', src: BASE_OUTFIT+'Female_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_F },
+    ],
+    'Cheveux': [
+        'Hair_Long','Hair_SimpleParted','Hair_Buzzed','Hair_BuzzedFemale',
+        'Hair_Buns','Hair_Beard',
+        'Eyebrows_Regular','Eyebrows_Female',
+    ].map(n => ({ name:n, src: BASE_HAIR+n+'.gltf' })),
+    'Nature': [
+        'BirchTree_1','BirchTree_2','BirchTree_3','BirchTree_4','BirchTree_5',
+        'MapleTree_1','MapleTree_2','MapleTree_3','MapleTree_4','MapleTree_5',
+        'DeadTree_1','DeadTree_2','DeadTree_3','DeadTree_4','DeadTree_5',
+        'DeadTree_6','DeadTree_7','DeadTree_8','DeadTree_9','DeadTree_10',
+        'Bush','Bush_Flowers','Bush_Large','Bush_Large_Flowers','Bush_Small','Bush_Small_Flowers',
+        'Flower_1','Flower_1_Clump','Flower_2','Flower_2_Clump',
+        'Flower_3_Clump','Flower_4_Clump','Flower_5_Clump',
+        'Grass_Large','Grass_Large_Extruded','Grass_Small',
+    ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+    'Bâtiments': [
+        'Wall_Plaster_Straight','Wall_Plaster_Straight_Base','Wall_Plaster_Door_Flat',
+        'Wall_Plaster_Door_Round','Wall_Plaster_Window_Wide_Flat','Wall_Plaster_Window_Wide_Round',
+        'Wall_Plaster_Window_Thin_Round','Wall_Plaster_WoodGrid',
+        'Wall_UnevenBrick_Straight','Wall_UnevenBrick_Door_Flat','Wall_UnevenBrick_Door_Round',
+        'Wall_UnevenBrick_Window_Wide_Flat','Wall_UnevenBrick_Window_Wide_Round',
+        'Corner_Exterior_Wood','Corner_Exterior_Brick','Corner_ExteriorWide_Wood','Corner_ExteriorWide_Brick',
+        'Corner_Interior_Big','Corner_Interior_Small',
+        'Floor_Brick','Floor_RedBrick','Floor_WoodDark','Floor_WoodLight',
+        'Roof_RoundTiles_4x4','Roof_RoundTiles_4x6','Roof_RoundTiles_6x6','Roof_RoundTiles_6x8',
+        'Roof_RoundTiles_8x8','Roof_2x4_RoundTile','Roof_Dormer_RoundTile','Roof_Tower_RoundTiles',
+        'Roof_Front_Brick4','Roof_Front_Brick6','Roof_Front_Brick8',
+        'Door_1_Flat','Door_1_Round','Door_2_Flat','Door_2_Round','Door_4_Flat','Door_4_Round',
+        'Window_Thin_Flat1','Window_Thin_Round1','Window_Wide_Flat1','Window_Wide_Round1',
+        'WindowShutters_Wide_Flat_Open','WindowShutters_Wide_Round_Open',
+        'Balcony_Simple_Straight','Balcony_Cross_Straight',
+        'Stair_Interior_Simple','Stair_Interior_Solid',
+        'Stairs_Exterior_Straight','Stairs_Exterior_Platform',
+        'Prop_Chimney','Prop_Chimney2','Prop_Support','Prop_Wagon','Prop_Crate',
+        'Prop_WoodenFence_Single','Prop_MetalFence_Simple',
+        'Prop_Vine1','Prop_Vine2','Prop_Vine4',
+        'Overhang_Plaster_Long','Overhang_Plaster_Short','Overhang_UnevenBrick_Long',
+    ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+    'Props': [
+        'Anvil','Anvil_Log','Axe_Bronze','Bag','Banner_1','Banner_2',
+        'Barrel','Barrel_Apples','Barrel_Holder',
+        'Bed_Twin1','Bed_Twin2','Bench','Bookcase_2',
+        'Bucket_Metal','Bucket_Wooden_1','Cabinet','Cage_Small',
+        'CandleStick','CandleStick_Stand','CandleStick_Triple','Chandelier',
+        'Chest_Wood','Coin_Pile','Coin_Pile_2','Crate_Wooden','Crate_Metal',
+        'Chair_1','Chalice','Cauldron',
+        'FarmCrate_Apple','FarmCrate_Carrot','FarmCrate_Empty',
+        'Key_Gold','Key_Metal','Lantern_Wall','Mug',
+        'Pickaxe_Bronze','Pot_1','Potion_1','Potion_2','Potion_4',
+        'Pouch_Large','Rope_1','Scroll_1','Scroll_2',
+        'Shield_Wooden','Stall_Empty','Stall_Cart_Empty','Stool',
+        'Sword_Bronze','Table_Large','Torch_Metal',
+        'Vase_2','Vase_4','WeaponStand','Workbench','Workbench_Drawers',
+    ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+};
+
+const CAT_ICONS = {
+    'Personnages': '♟', 'Cheveux': '✂', 'Nature': '🌿', 'Bâtiments': '🏠', 'Props': '⚔'
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  SCÈNE THREE.JS
+// ═══════════════════════════════════════════════════════════════
+const vp = document.getElementById('viewport');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111418);
+scene.fog = new THREE.FogExp2(0x111418, 0.04);
+
+const camera = new THREE.PerspectiveCamera(50, vp.clientWidth / vp.clientHeight, 0.05, 200);
+camera.position.set(0, 1.5, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(vp.clientWidth, vp.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+vp.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 0.3;
+controls.maxDistance = 80;
+controls.update();
+
+// Lumières
+scene.add(new THREE.AmbientLight(0xffd8a0, 0.6));
+const sun = new THREE.DirectionalLight(0xfff4d0, 2.5);
+sun.position.set(5, 8, 4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 60;
+sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+sun.shadow.camera.top  =  20; sun.shadow.camera.bottom = -20;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x8090b0, 0.7);
+fill.position.set(-4, 3, -4);
+scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffaa44, 0.9);
+rim.position.set(0, 4, -6);
+scene.add(rim);
+
+// Sol
+const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(30, 64),
+    new THREE.MeshStandardMaterial({ color: 0x181410, roughness: 0.95 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.2, 1.27, 72),
+    new THREE.MeshBasicMaterial({ color: 0x3a2e1a, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.002;
+scene.add(ring);
+
+// Grille subtile
+const grid = new THREE.GridHelper(20, 20, 0x201810, 0x1a140c);
+grid.position.y = 0.001;
+scene.add(grid);
+
+// ═══════════════════════════════════════════════════════════════
+//  ÉTAT
+// ═══════════════════════════════════════════════════════════════
+const loader   = new GLTFLoader();
+let currentMdl = null, mixer = null, activeAction = null;
+let ualGltf    = null, currentUAL = 2;
+let allClips   = [], animFilter = '';
+let bodyClipPlane = null, headBone = null;
+const headBoneWP  = new THREE.Vector3();
+
+// ── Chargement UAL (lazy) ─────────────────────────────────────
+function loadUAL(n) {
+    currentUAL = n;
+    ualGltf    = null;
+    allClips   = [];
+    document.getElementById('clip-list').innerHTML =
+        '<div style="padding:8px 14px;font-size:9px;opacity:.3;letter-spacing:2px">CHARGEMENT UAL'+n+'...</div>';
+    loader.load(UAL_PATHS[n], gltf => {
+        ualGltf = gltf;
+        if (currentMdl?._animated) rebuildClips();
+    }, undefined, err => console.error('UAL:', err));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ATTACHEMENT CORPS DE BASE (même logique que character.js)
+// ═══════════════════════════════════════════════════════════════
+const HEAD_MESHES = new Set(['Eyebrows', 'Eyes', 'SuperHero_Male', 'SuperHero_Female']);
+
+function attachBody(baseGltf, outfitRoot) {
+    bodyClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    headBone = null;
+
+    // Table des os de l'outfit
+    const outfitBones = {};
+    outfitRoot.traverse(n => { if (n.isBone) outfitBones[n.name] = n; });
+
+    // Trouver l'os head pour ancrer le clip plane
+    headBone = outfitBones['head'] || outfitBones['Head'] || null;
+
+    // 1re passe : collecter les meshes du corps
+    const toAttach = [];
+    baseGltf.scene.traverse(n => {
+        if (n.isSkinnedMesh && HEAD_MESHES.has(n.name)) toAttach.push(n);
+    });
+
+    // 2e passe : rebind + ajout
+    for (const node of toAttach) {
+        const newBones = node.skeleton.bones.map(b => outfitBones[b.name]);
+        if (newBones.some(b => !b)) continue;
+
+        const newSkeleton = new THREE.Skeleton(newBones, node.skeleton.boneInverses);
+        node.position.set(0, 0, 0);
+        node.rotation.set(0, 0, 0);
+        node.scale.set(1, 1, 1);
+        node.bind(newSkeleton, new THREE.Matrix4());
+
+        const isBody = node.name === 'SuperHero_Male' || node.name === 'SuperHero_Female';
+        const clonedMats = (Array.isArray(node.material) ? node.material : [node.material])
+            .map(m => m ? m.clone() : m);
+        node.material = Array.isArray(node.material) ? clonedMats : clonedMats[0];
+        for (const m of clonedMats) if (m) {
+            m.side = THREE.DoubleSide;
+            if (isBody) m.clippingPlanes = [bodyClipPlane];
+        }
+        node.castShadow    = true;
+        node.frustumCulled = false;
+        outfitRoot.add(node);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHARGEMENT MODÈLE
+// ═══════════════════════════════════════════════════════════════
+function loadModel(item) {
+    // Nettoyer
+    if (activeAction) { activeAction.stop(); activeAction = null; }
+    if (mixer)        { mixer.stopAllAction(); mixer = null; }
+    if (currentMdl)   { scene.remove(currentMdl._root); currentMdl = null; }
+    bodyClipPlane = null; headBone = null;
+
+    document.getElementById('vp-loading').style.display = 'block';
+    document.getElementById('vp-label').textContent = item.name;
+
+    const pOutfit = new Promise((res, rej) => loader.load(item.src, res, undefined, rej));
+    const pBody   = item.bodyUrl
+        ? new Promise((res, rej) => loader.load(item.bodyUrl, res, undefined, rej))
+        : Promise.resolve(null);
+
+    Promise.all([pOutfit, pBody]).then(([gltf, bodyGltf]) => {
+        document.getElementById('vp-loading').style.display = 'none';
+
+        const root = item.animated
+            ? SkeletonUtils.clone(gltf.scene)
+            : gltf.scene.clone(true);
+
+        root.traverse(c => {
+            if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+                c.frustumCulled = false;
+                const mats = Array.isArray(c.material) ? c.material : [c.material];
+                mats.forEach(m => { if (m) m.side = THREE.DoubleSide; });
+            }
+        });
+
+        // Calibrer à 1.75m
+        const box0 = new THREE.Box3().setFromObject(root);
+        const h0   = box0.max.y - box0.min.y;
+        root.scale.setScalar(1.75 / h0);
+
+        if (bodyGltf) attachBody(bodyGltf, root);
+
+        scene.add(root);
+
+        // Poser sur le sol + auto-fit caméra
+        const box = new THREE.Box3().setFromObject(root);
+        root.position.y -= box.min.y;
+        const size   = box.getSize(new THREE.Vector3());
+        const center = new THREE.Vector3(0, size.y * 0.5, 0);
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        controls.target.copy(center);
+        const dist = maxDim * 1.8;
+        camera.position.set(dist * 0.6, center.y + dist * 0.3, dist);
+        controls.minDistance = maxDim * 0.1;
+        controls.maxDistance = maxDim * 12;
+        controls.update();
+
+        currentMdl = { _root: root, _animated: !!item.animated };
+
+        document.getElementById('anim-panel').style.display =
+            item.animated ? 'flex' : 'none';
+
+        if (item.animated) {
+            mixer = new THREE.AnimationMixer(root);
+            if (ualGltf) rebuildClips();
+            else loadUAL(currentUAL);
+        }
+
+    }).catch(err => {
+        document.getElementById('vp-loading').style.display = 'none';
+        document.getElementById('vp-label').textContent = '⚠ ' + err.message;
+        console.error(err);
+    });
+}
+
+// ── Rebuild clip list ─────────────────────────────────────────
+function rebuildClips() {
+    if (!ualGltf || !mixer) return;
+    allClips = [...ualGltf.animations].sort((a, b) => a.name.localeCompare(b.name));
+    renderClipList();
+    const idle = allClips.find(c => c.name.toLowerCase().includes('idle_loop'))
+              || allClips.find(c => c.name.toLowerCase().includes('idle'))
+              || allClips[0];
+    if (idle) playClip(idle);
+}
+
+function renderClipList() {
+    const term = animFilter.toLowerCase();
+    const list = allClips.filter(c => !term || c.name.toLowerCase().includes(term));
+    const el   = document.getElementById('clip-list');
+    el.innerHTML = '';
+    for (const clip of list) {
+        const div = document.createElement('div');
+        div.className = 'clip-item';
+        div.dataset.name = clip.name;
+        div.innerHTML = `<span>${clip.name}</span><span class="dur">${clip.duration.toFixed(2)}s</span>`;
+        div.addEventListener('click', () => {
+            document.querySelectorAll('.clip-item').forEach(b => b.classList.remove('active'));
+            div.classList.add('active');
+            playClip(clip);
+        });
+        el.appendChild(div);
+    }
+}
+
+function playClip(clip) {
+    if (!mixer) return;
+    if (activeAction) activeAction.fadeOut(0.2);
+    const action = mixer.clipAction(clip);
+    action.reset().fadeIn(0.2).play();
+    activeAction = action;
+    document.getElementById('vp-label').textContent =
+        document.querySelector('.model-item.active')?.textContent?.trim() + '\n' + clip.name;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UI — LISTE MODÈLES
+// ═══════════════════════════════════════════════════════════════
+let currentCat = 'Personnages';
+let searchTerm = '';
+
+function renderList() {
+    const items = CATALOG[currentCat] || [];
+    const term  = searchTerm.toLowerCase();
+    const filtered = items.filter(i => !term || i.name.toLowerCase().includes(term));
+
+    const el = document.getElementById('model-list');
+    el.innerHTML = '';
+    for (const item of filtered) {
+        const div = document.createElement('div');
+        div.className = 'model-item';
+        div.innerHTML = `<span class="icon">${CAT_ICONS[currentCat]||'◆'}</span><span>${item.name}</span>`;
+        div.addEventListener('click', () => {
+            document.querySelectorAll('.model-item').forEach(b => b.classList.remove('active'));
+            div.classList.add('active');
+            loadModel(item);
+        });
+        el.appendChild(div);
+    }
+    document.getElementById('model-count').textContent =
+        filtered.length + ' / ' + items.length + ' assets';
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCat = tab.dataset.cat;
+        document.getElementById('search').value = '';
+        searchTerm = '';
+        renderList();
+        // Masquer panel anim si pas personnage
+        if (currentCat !== 'Personnages') {
+            document.getElementById('anim-panel').style.display = 'none';
+        }
+    });
+});
+
+// Recherche
+document.getElementById('search').addEventListener('input', e => {
+    searchTerm = e.target.value;
+    renderList();
+});
+
+// UAL toggle
+document.querySelectorAll('.ual-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.ual-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadUAL(parseInt(btn.dataset.ual));
+    });
+});
+
+// Anim search
+document.getElementById('anim-search').addEventListener('input', e => {
+    animFilter = e.target.value;
+    renderClipList();
+});
+
+// Init
+renderList();
+
+// ═══════════════════════════════════════════════════════════════
+//  BOUCLE
+// ═══════════════════════════════════════════════════════════════
+const clock = new THREE.Clock();
+(function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    if (mixer) mixer.update(delta);
+    // Clip plane tête : 0.22m sous l'os head
+    if (bodyClipPlane && headBone) {
+        headBone.getWorldPosition(headBoneWP);
+        bodyClipPlane.constant = -(headBoneWP.y - 0.22);
+    }
+    controls.update();
+    renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+    camera.aspect = vp.clientWidth / vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth, vp.clientHeight);
+});
+</script>
+</body>
+</html>

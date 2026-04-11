@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Nature Pack — Browser</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+#sidebar {
+    width:220px; flex-shrink:0; background:#0a0c0e;
+    border-right:1px solid rgba(200,184,154,0.1);
+    display:flex; flex-direction:column; overflow:hidden;
+}
+#search {
+    background:rgba(200,184,154,0.06); border:none;
+    border-bottom:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:12px 14px; font-family:'Georgia',serif;
+    font-size:11px; letter-spacing:1px; outline:none; width:100%;
+}
+#search::placeholder { color:rgba(200,184,154,0.25); }
+#categories { display:flex; flex-wrap:wrap; gap:4px; padding:8px; border-bottom:1px solid rgba(200,184,154,0.08); }
+.cat-btn {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); padding:3px 8px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s; text-transform:uppercase;
+}
+.cat-btn:hover, .cat-btn.active { background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4); }
+
+#list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.item {
+    padding:8px 14px; font-size:10px; letter-spacing:0.5px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.item:hover  { background:rgba(200,184,154,0.08); }
+.item.active { background:rgba(200,184,154,0.15); color:#fff; }
+#count { padding:8px 14px; font-size:9px; letter-spacing:2px; color:rgba(200,184,154,0.25); border-top:1px solid rgba(200,184,154,0.08); }
+
+#viewport { flex:1; position:relative; }
+#viewport canvas { display:block; width:100% !important; height:100% !important; }
+#obj-name {
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.5); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; pointer-events:none; text-align:center;
+}
+#hint {
+    position:absolute; bottom:16px; right:16px;
+    color:rgba(200,184,154,0.2); font-size:9px; letter-spacing:1px;
+    line-height:2; text-align:right; pointer-events:none;
+}
+#loading-overlay {
+    position:absolute; inset:0; background:rgba(13,15,18,0.7);
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(200,184,154,0.4); font-size:11px; letter-spacing:3px;
+    pointer-events:none; opacity:0; transition:opacity 0.2s;
+}
+#loading-overlay.visible { opacity:1; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="sidebar">
+    <input id="search" type="text" placeholder="Rechercher...">
+    <div id="categories"></div>
+    <div id="list"></div>
+    <div id="count"></div>
+</div>
+
+<div id="viewport">
+    <div id="obj-name">—</div>
+    <div id="loading-overlay">Chargement...</div>
+    <div id="hint">Clic droit + drag : orbiter<br>Molette : zoom<br>Clic gauche + drag : panoramique</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const BASE = 'Nature Pack[Standard]/glTF/';
+const OBJECTS = [
+    'BirchTree_1','BirchTree_2','BirchTree_3','BirchTree_4','BirchTree_5',
+    'Bush','Bush_Flowers','Bush_Large','Bush_Large_Flowers','Bush_Small','Bush_Small_Flowers',
+    'DeadTree_1','DeadTree_2','DeadTree_3','DeadTree_4','DeadTree_5',
+    'DeadTree_6','DeadTree_7','DeadTree_8','DeadTree_9','DeadTree_10',
+    'Flower_1','Flower_1_Clump','Flower_2','Flower_2_Clump',
+    'Flower_3_Clump','Flower_4_Clump','Flower_5_Clump',
+    'Grass_Large','Grass_Large_Extruded','Grass_Small',
+    'MapleTree_1','MapleTree_2','MapleTree_3','MapleTree_4','MapleTree_5',
+];
+const CATEGORIES = ['Tout','BirchTree','Bush','DeadTree','Flower','Grass','MapleTree'];
+
+// ── Scène ─────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1a12); // teinte forêt
+scene.fog = new THREE.FogExp2(0x0e1a12, 0.04);
+
+const vp     = document.getElementById('viewport');
+const camera = new THREE.PerspectiveCamera(50, vp.clientWidth / vp.clientHeight, 0.01, 200);
+camera.position.set(3, 3, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(vp.clientWidth, vp.clientHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+vp.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+// Lumières — ambiance forêt
+scene.add(new THREE.AmbientLight(0xc8e8b0, 1.2));
+const sun = new THREE.DirectionalLight(0xfff4c0, 2.5);
+sun.position.set(6, 10, 4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+const fillLN = new THREE.DirectionalLight(0x4080a0, 0.5);
+fillLN.position.set(-4, 3, -4);
+scene.add(fillLN);
+
+// Sol herbe
+const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(20, 32),
+    new THREE.MeshStandardMaterial({ color: 0x2d4a1e, roughness: 0.95 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ── Chargement ────────────────────────────────────────────────────
+let current = null;
+const loader = new GLTFLoader();
+const overlay = document.getElementById('loading-overlay');
+
+function loadObject(name) {
+    overlay.classList.add('visible');
+    document.getElementById('obj-name').textContent = name;
+    document.querySelectorAll('.item').forEach(el => el.classList.toggle('active', el.dataset.name === name));
+
+    if (current) { scene.remove(current); current = null; }
+
+    loader.load(BASE + name + '.gltf', (gltf) => {
+        const obj = gltf.scene;
+        obj.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+
+        const box = new THREE.Box3().setFromObject(obj);
+        const ctr = box.getCenter(new THREE.Vector3());
+        obj.position.sub(ctr);
+        obj.position.y -= box.min.y - ctr.y;
+
+        scene.add(obj);
+        current = obj;
+
+        const size = box.getSize(new THREE.Vector3()).length();
+        const dist = size * 1.6;
+        controls.target.set(0, (box.max.y - box.min.y) * 0.4, 0);
+        camera.position.set(dist * 0.7, dist * 0.5, dist * 0.7);
+        controls.update();
+
+        overlay.classList.remove('visible');
+    }, undefined, (err) => {
+        overlay.classList.remove('visible');
+        console.error(err);
+    });
+}
+
+// ── UI ────────────────────────────────────────────────────────────
+let activeCat = 'Tout', searchTerm = '';
+
+const catEl = document.getElementById('categories');
+CATEGORIES.forEach(cat => {
+    const btn = document.createElement('div');
+    btn.className = 'cat-btn' + (cat === 'Tout' ? ' active' : '');
+    btn.textContent = cat;
+    btn.addEventListener('click', () => {
+        activeCat = cat;
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderList();
+    });
+    catEl.appendChild(btn);
+});
+
+document.getElementById('search').addEventListener('input', e => {
+    searchTerm = e.target.value.toLowerCase();
+    renderList();
+});
+
+function renderList() {
+    const filtered = OBJECTS.filter(name => {
+        const catMatch = activeCat === 'Tout' || name.startsWith(activeCat);
+        const srcMatch = name.toLowerCase().includes(searchTerm);
+        return catMatch && srcMatch;
+    });
+    const listEl = document.getElementById('list');
+    listEl.innerHTML = '';
+    filtered.forEach(name => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.dataset.name = name;
+        el.textContent = name;
+        el.addEventListener('click', () => loadObject(name));
+        listEl.appendChild(el);
+    });
+    document.getElementById('count').textContent = filtered.length + ' objets';
+}
+
+renderList();
+loadObject('MapleTree_1');
+
+(function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+    camera.aspect = vp.clientWidth / vp.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(vp.clientWidth, vp.clientHeight);
+});
+</script>
+</body>
+</html>

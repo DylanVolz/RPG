@@ -1,0 +1,32 @@
+# ── Assets Quaternius (non redistribuables) ─────────────────────────────────
+assets/characters/animations/*.glb
+assets/characters/bodies/*.gltf
+assets/characters/bodies/*.bin
+assets/characters/bodies/*.png
+assets/characters/hair/*.gltf
+assets/characters/hair/*.bin
+assets/characters/hair/*.png
+assets/characters/outfits/*.gltf
+assets/characters/outfits/*.bin
+assets/characters/outfits/*.png
+assets/characters/modular/*.gltf
+assets/characters/modular/*.bin
+assets/characters/modular/*.png
+assets/environment/village/*.gltf
+assets/environment/village/*.bin
+assets/environment/village/*.png
+assets/environment/props/*.gltf
+assets/environment/props/*.bin
+assets/environment/props/*.png
+assets/environment/nature/*.gltf
+assets/environment/nature/*.bin
+assets/environment/nature/*.png
+assets/environment/nature/*.jpg
+
+# ── Sources / zips ───────────────────────────────────────────────────────────
+_source/
+
+# ── Debug / local ────────────────────────────────────────────────────────────
+screenshots_debug/
+*.bak
+.claude/

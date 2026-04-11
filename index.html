@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Dark RPG</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Georgia', serif; }
+canvas { display:block; }
+
+/* ── Zone name ─────────────────────────────────── */
+#zone-name {
+    position:fixed; top:38px; left:50%; transform:translateX(-50%);
+    color:#c8b89a; font-size:15px; letter-spacing:3px; text-transform:uppercase;
+    opacity:0; transition:opacity 1.2s;
+    text-shadow:0 0 12px rgba(0,0,0,0.9);
+    pointer-events:none;
+}
+#zone-name.visible { opacity:1; }
+
+/* ── Camera mode ───────────────────────────────── */
+#camera-mode {
+    position:fixed; bottom:18px; right:18px;
+    color:rgba(180,160,130,0.5); font-size:11px; letter-spacing:2px;
+    pointer-events:none;
+}
+
+/* ── Horloge in-game ────────────────────────────── */
+#clock {
+    position:fixed; top:18px; right:18px;
+    color:rgba(180,160,130,0.45); font-size:12px; letter-spacing:3px;
+    pointer-events:none;
+}
+
+/* ── Crosshair (FPS only) ──────────────────────── */
+#crosshair {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:12px; height:12px; pointer-events:none;
+    display:none;
+}
+#crosshair::before,#crosshair::after {
+    content:''; position:absolute; background:rgba(255,255,255,0.7);
+}
+#crosshair::before { width:2px; height:12px; left:5px; top:0; }
+#crosshair::after  { width:12px; height:2px; left:0; top:5px; }
+
+/* ── Barres HP / Endurance ─────────────────────── */
+#bars {
+    position:fixed; bottom:28px; left:28px;
+    display:flex; flex-direction:column; gap:6px;
+    pointer-events:none;
+}
+.bar-wrap {
+    display:flex; align-items:center; gap:8px;
+}
+.bar-label { color:rgba(180,160,130,0.6); font-size:10px; letter-spacing:2px; width:20px; }
+.bar-bg {
+    width:140px; height:4px; background:rgba(255,255,255,0.08);
+    border-radius:2px; overflow:hidden;
+}
+.bar-fill { height:100%; border-radius:2px; transition:width 0.15s; }
+#hp-fill    { background:#8a2020; width:100%; }
+#sta-fill   { background:#1e5c4a; width:100%; }
+
+/* ── Minimap ───────────────────────────────────── */
+#minimap-canvas {
+    position:fixed; bottom:28px; right:28px;
+    width:160px; height:160px; border-radius:50%;
+    opacity:0; transition:opacity 0.5s;
+    pointer-events:none;
+}
+#minimap-canvas.visible { opacity:1; }
+
+/* ── Voix des Dieux ────────────────────────────── */
+.god-voice {
+    position:fixed; max-width:260px; font-size:13px;
+    font-style:italic; line-height:1.6;
+    opacity:0; transition:opacity 1.0s;
+    pointer-events:none; text-shadow:0 0 8px currentColor;
+}
+.god-voice.visible { opacity:1; }
+.god-voice .god-name {
+    display:block; font-size:10px; letter-spacing:2px;
+    font-style:normal; margin-bottom:4px; opacity:0.6;
+}
+
+#god-vareth { color:#cc2222; bottom:80px; left:28px;  }
+#god-sorel  { color:#d0d8e0; top:80px;   left:50%; transform:translateX(-50%); text-align:center; }
+#god-maren  { color:#c8a020; top:80px;   right:28px;  text-align:right; }
+#god-dusk   { color:#9933cc; bottom:80px; right:28px; text-align:right; }
+#god-brahl  { color:#778899; bottom:80px; left:50%; transform:translateX(-50%); text-align:center; }
+#god-ylene  { color:#2266cc; top:80px;   left:28px;  }
+#god-orvane { color:#cc6611; top:50%;    left:50%; transform:translate(-50%,-50%); text-align:center; }
+
+/* ── Message de dérive d'identité ──────────────── */
+#drift-msg {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(200,184,154,0.85); font-size:14px; font-style:italic;
+    letter-spacing:1px; text-align:center; max-width:320px; line-height:1.8;
+    opacity:0; transition:opacity 1.4s;
+    pointer-events:none;
+    text-shadow:0 0 20px rgba(0,0,0,1);
+}
+#drift-msg.visible { opacity:1; }
+
+/* ── Menu pause ────────────────────────────────── */
+#pause-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.7);
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+    gap:16px;
+}
+#pause-overlay.visible { display:flex; }
+#pause-overlay h2 { color:#c8b89a; font-size:22px; letter-spacing:4px; margin-bottom:12px; }
+#time-slider-wrap {
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    border:1px solid rgba(200,184,154,0.2); padding:12px 28px;
+    border-radius:4px; background:rgba(0,0,0,0.3);
+}
+#time-slider-wrap label {
+    color:rgba(200,184,154,0.7); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase;
+}
+#time-slider-wrap .time-val {
+    color:#c8b89a; font-size:18px; letter-spacing:2px; min-width:60px; text-align:center;
+}
+#time-slider {
+    -webkit-appearance:none; width:220px; height:3px;
+    background:rgba(200,184,154,0.25); border-radius:2px; outline:none; cursor:pointer;
+}
+#time-slider::-webkit-slider-thumb {
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:#c8b89a; cursor:pointer;
+}
+.menu-btn {
+    background:none; border:1px solid rgba(200,184,154,0.3);
+    color:#c8b89a; padding:10px 40px; font-family:inherit;
+    font-size:14px; letter-spacing:2px; cursor:pointer;
+    transition:background 0.2s;
+}
+.menu-btn:hover { background:rgba(200,184,154,0.1); }
+
+/* ── Mode combat / sélection ───────────────────── */
+#mode-indicator {
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    color:rgba(180,160,130,0.45); font-size:10px; letter-spacing:3px;
+    text-transform:uppercase; pointer-events:none;
+}
+#mode-indicator.combat { color:rgba(200,80,80,0.7); }
+
+/* ── Inventaire ────────────────────────────────── */
+#inventory {
+    position:fixed; inset:0; background:rgba(0,0,0,0.87);
+    display:flex; align-items:center; justify-content:center;
+    z-index:90; opacity:0; pointer-events:none;
+    transition:opacity 0.2s ease; font-family:'Georgia',serif;
+}
+#inventory.visible { opacity:1; pointer-events:all; }
+.inv-panel { background:#0d0a06; border:2px solid #7a5c2a; box-shadow:0 0 0 1px #1a1208,0 0 0 4px #0a0806,0 0 80px rgba(0,0,0,0.97),inset 0 0 120px rgba(0,0,0,0.6); width:980px; max-height:95vh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#3a2818 transparent; position:relative; display:flex; flex-direction:column; }
+.inv-panel::after { content:''; position:absolute; inset:5px; border:1px solid rgba(180,140,60,0.12); pointer-events:none; z-index:999; }
+.inv-header { display:flex; align-items:center; justify-content:space-between; padding:7px 16px; background:linear-gradient(90deg,#0d0a06 0%,#181006 40%,#181006 60%,#0d0a06 100%); border-bottom:1px solid #7a5c2a; }
+.inv-title { font-size:0.8rem; letter-spacing:0.7em; color:#c8a050; text-transform:uppercase; }
+.inv-title-sub { font-size:0.46rem; letter-spacing:0.25em; color:#5a4228; font-style:italic; margin-left:1.2rem; }
+.inv-title-wrap { display:flex; align-items:baseline; }
+.inv-close-btn { background:linear-gradient(180deg,#1c1408,#100e06); border:1px solid #5a4220; color:#7a5a30; padding:4px 12px; cursor:pointer; font-size:0.65rem; font-family:'Georgia',serif; letter-spacing:0.12em; text-transform:uppercase; transition:all 0.15s; }
+.inv-close-btn:hover { border-color:#c8a050; color:#c8a050; }
+.inv-body { display:flex; flex:1; }
+.inv-col-left { width:340px; flex-shrink:0; border-right:1px solid #3a2a10; display:flex; flex-direction:column; }
+.inv-col-center { flex:1; border-right:1px solid #3a2a10; display:flex; flex-direction:column; align-items:center; background:radial-gradient(ellipse at 50% 55%,rgba(0,40,20,0.18) 0%,transparent 70%); }
+.inv-col-right { width:210px; flex-shrink:0; display:flex; flex-direction:column; }
+.inv-sec-hdr { font-size:0.48rem; letter-spacing:0.55em; color:#8a6832; text-transform:uppercase; text-align:center; padding:6px 0 5px; background:linear-gradient(90deg,transparent,rgba(200,160,60,0.06),transparent); border-bottom:1px solid #3a2a10; position:relative; }
+.inv-sec-hdr::before { content:'✦'; margin-right:0.6em; font-size:0.36rem; color:#5a4220; }
+.inv-sec-hdr::after  { content:'✦'; margin-left:0.6em;  font-size:0.36rem; color:#5a4220; }
+.inv-hr { height:1px; background:linear-gradient(90deg,transparent,#3a2a10 25%,#5a4020 50%,#3a2a10 75%,transparent); }
+.inv-slot { background:linear-gradient(135deg,#100c06,#080604); border:1px solid #3a2810; box-shadow:inset 0 2px 4px rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; transition:border-color 0.1s,box-shadow 0.1s; }
+.inv-slot:hover { border-color:#9a7830; box-shadow:inset 0 2px 4px rgba(0,0,0,0.6),0 0 10px rgba(180,140,50,0.15); }
+.inv-slot canvas { width:100%; height:100%; display:block; pointer-events:none; }
+.slot-lbl { font-size:0.38rem; letter-spacing:0.05em; color:#4a3618; text-transform:uppercase; text-align:center; line-height:1.5; pointer-events:none; padding:3px; }
+.inv-skills-grid { display:grid; grid-template-columns:repeat(4,52px); gap:4px; padding:8px 10px; }
+.inv-skill-slot { width:52px; height:52px; background:linear-gradient(135deg,#0e0a05,#060403); border:1px solid #2e2010; box-shadow:inset 0 2px 4px rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; }
+.inv-skill-slot .skill-ico { font-size:1.1rem; opacity:0.2; user-select:none; }
+.inv-bag-wrap { padding:8px 10px 10px; }
+.inv-bag-grid { display:grid; grid-template-columns:repeat(6,48px); gap:3px; }
+.inv-bag-slot { width:48px; height:48px; }
+.inv-paperdoll { position:relative; width:320px; height:450px; margin:10px auto 6px; flex-shrink:0; }
+#inv-3d { position:absolute; left:85px; top:68px; width:150px; height:290px; display:block; z-index:1; }
+.inv-eq-slot { width:58px; height:58px; position:absolute; z-index:2; }
+.inv-eq-slot[data-slot="head"]   { top:  4px; left:131px; } .inv-eq-slot[data-slot="neck"]   { top: 56px; left:  8px; }
+.inv-eq-slot[data-slot="chest"]  { top: 82px; left:254px; } .inv-eq-slot[data-slot="weapon"] { top:150px; left:  8px; }
+.inv-eq-slot[data-slot="back"]   { top:158px; left:254px; } .inv-eq-slot[data-slot="shield"] { top:226px; left:  8px; }
+.inv-eq-slot[data-slot="gloves"] { top:234px; left:254px; } .inv-eq-slot[data-slot="ring_l"] { top:305px; left:  8px; }
+.inv-eq-slot[data-slot="legs"]   { top:318px; left:131px; } .inv-eq-slot[data-slot="ring_r"] { top:305px; left:254px; }
+.inv-eq-slot[data-slot="feet"]   { top:384px; left: 58px; } .inv-eq-slot[data-slot="belt"]   { top:384px; left:204px; }
+.inv-eq-slot::before { content:''; position:absolute; background:rgba(180,140,50,0.12); pointer-events:none; }
+.inv-eq-slot[data-slot="neck"]::before,.inv-eq-slot[data-slot="weapon"]::before,.inv-eq-slot[data-slot="shield"]::before,.inv-eq-slot[data-slot="ring_l"]::before { top:50%; right:-24px; width:22px; height:1px; }
+.inv-eq-slot[data-slot="chest"]::before,.inv-eq-slot[data-slot="back"]::before,.inv-eq-slot[data-slot="gloves"]::before,.inv-eq-slot[data-slot="ring_r"]::before { top:50%; left:-24px; width:22px; height:1px; }
+.inv-char-name { font-size:0.54rem; letter-spacing:0.3em; color:#7a5a2a; text-transform:uppercase; text-align:center; font-style:italic; margin-top:4px; }
+.inv-quick-row { display:flex; gap:4px; justify-content:center; }
+.inv-quick-slot { width:58px; height:58px; border:1px solid #5a4020; box-shadow:inset 0 2px 4px rgba(0,0,0,0.8); }
+.inv-quick-slot:hover { border-color:#c8a050; }
+.inv-quick-badge { position:absolute; top:3px; left:4px; font-size:0.5rem; color:#6a5028; pointer-events:none; z-index:1; }
+.inv-quick-hint { font-size:0.4rem; letter-spacing:0.3em; color:#3a2a14; text-transform:uppercase; text-align:center; margin-top:4px; }
+.inv-char-info { padding:10px 12px 6px; border-bottom:1px solid #2a1e0c; }
+.inv-char-bigname { font-size:0.72rem; letter-spacing:0.12em; color:#c8a050; }
+.inv-char-class { font-size:0.44rem; letter-spacing:0.2em; color:#5a4228; text-transform:uppercase; margin-top:3px; font-style:italic; }
+.inv-stats-list { padding:8px 12px 10px; display:flex; flex-direction:column; gap:4px; }
+.inv-stat-row { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:rgba(0,0,0,0.35); border:1px solid #221808; border-left:2px solid #4a3418; font-size:0.56rem; letter-spacing:0.06em; color:#6a5030; text-transform:uppercase; }
+.inv-stat-row b { color:#c8a882; font-size:0.6rem; }
+.inv-footer { border-top:1px solid #3a2a10; padding:8px 14px; display:flex; align-items:center; gap:16px; background:linear-gradient(90deg,#0d0a06,#100d07,#0d0a06); }
+.inv-qty { position:absolute; bottom:2px; right:3px; font-size:0.58rem; color:#c8a882; pointer-events:none; text-shadow:0 0 4px #000; }
+.inv-tooltip { position:fixed; z-index:200; display:none; background:linear-gradient(160deg,#181008,#0c0904); border:1px solid #6a4e20; box-shadow:0 0 0 1px #1a1208,0 12px 40px rgba(0,0,0,0.95); padding:10px 13px; min-width:190px; max-width:240px; pointer-events:none; }
+.tt-name { font-size:0.8rem; letter-spacing:0.04em; margin-bottom:3px; text-shadow:0 0 12px currentColor; }
+.tt-rar { font-size:0.48rem; letter-spacing:0.2em; text-transform:uppercase; font-style:italic; margin-bottom:8px; border-bottom:1px solid #2a1e0a; padding-bottom:6px; }
+.tt-row { display:flex; justify-content:space-between; font-size:0.6rem; color:#6a5a40; margin-bottom:3px; }
+.tt-row b { color:#c8a882; }
+.tt-desc { margin-top:8px; font-size:0.58rem; font-style:italic; color:#5a4a30; border-top:1px solid #2a1a0a; padding-top:7px; line-height:1.75; }
+.inv-ghost { position:fixed; width:58px; height:58px; pointer-events:none; z-index:300; display:none; opacity:0.88; }
+.inv-ghost canvas { width:100%; height:100%; display:block; }
+.inv-dragging { opacity:0.18; }
+
+/* ── Ecran de chargement ───────────────────────── */
+#loading {
+    position:fixed; inset:0; background:#000;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    gap:20px; z-index:100;
+}
+#loading h1 { color:#c8b89a; font-size:28px; letter-spacing:6px; }
+#loading-bar-bg { width:240px; height:2px; background:rgba(255,255,255,0.1); }
+#loading-bar-fill { height:100%; background:#c8b89a; width:0; transition:width 0.3s; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three":                          "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/":                  "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- Chargement -->
+<div id="loading">
+    <h1>DARK RPG</h1>
+    <div id="loading-bar-bg"><div id="loading-bar-fill"></div></div>
+    <p id="loading-hint" style="color:#c8b89a;font-size:13px;letter-spacing:3px;text-transform:uppercase;opacity:0;transition:opacity 1.2s;margin-top:18px;">Cliquez pour commencer</p>
+</div>
+
+<!-- HUD -->
+<div id="zone-name"></div>
+<div id="camera-mode">3RD</div>
+<div id="clock">08:00</div>
+<div id="mode-indicator">Sélection</div>
+<div id="crosshair"></div>
+
+<div id="bars">
+    <div class="bar-wrap">
+        <span class="bar-label">HP</span>
+        <div class="bar-bg"><div class="bar-fill" id="hp-fill"></div></div>
+    </div>
+    <div class="bar-wrap">
+        <span class="bar-label">END</span>
+        <div class="bar-bg"><div class="bar-fill" id="sta-fill"></div></div>
+    </div>
+</div>
+
+<canvas id="minimap-canvas"></canvas>
+
+<!-- Voix des 7 dieux -->
+<div id="god-vareth" class="god-voice"><span class="god-name">VARETH</span><span class="god-text"></span></div>
+<div id="god-sorel"  class="god-voice"><span class="god-name">SOREL</span><span class="god-text"></span></div>
+<div id="god-maren"  class="god-voice"><span class="god-name">MAREN</span><span class="god-text"></span></div>
+<div id="god-dusk"   class="god-voice"><span class="god-name">DUSK</span><span class="god-text"></span></div>
+<div id="god-brahl"  class="god-voice"><span class="god-name">BRAHL</span><span class="god-text"></span></div>
+<div id="god-ylene"  class="god-voice"><span class="god-name">YLENE</span><span class="god-text"></span></div>
+<div id="god-orvane" class="god-voice"><span class="god-name">ORVANE</span><span class="god-text"></span></div>
+
+<!-- Dérive d'identité -->
+<div id="drift-msg"></div>
+
+<!-- Pause -->
+<div id="pause-overlay">
+    <h2>PAUSE</h2>
+    <div id="time-slider-wrap">
+        <label>Heure du jour</label>
+        <span class="time-val" id="time-display">12:00</span>
+        <input type="range" id="time-slider" min="0" max="24" step="0.05" value="12">
+    </div>
+    <button class="menu-btn" id="btn-resume">REPRENDRE</button>
+    <button class="menu-btn" id="btn-save">SAUVEGARDER</button>
+    <button class="menu-btn" id="btn-fullscreen">MODE FENÊTRÉ</button>
+</div>
+
+<script type="module" src="src/game.js"></script>
+</body>
+</html>

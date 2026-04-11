@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Character Preview</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#111418; overflow:hidden; font-family:'Georgia', serif; }
+
+#ui {
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+}
+.btn {
+    background:rgba(0,0,0,0.6); border:1px solid rgba(200,184,154,0.35);
+    color:#c8b89a; padding:8px 16px; font-family:'Georgia',serif;
+    font-size:11px; letter-spacing:2px; cursor:pointer;
+    transition:all 0.15s; text-transform:uppercase;
+}
+.btn:hover  { background:rgba(200,184,154,0.12); border-color:#c8b89a; }
+.btn.active { background:rgba(200,184,154,0.2);  border-color:#c8b89a; color:#fff; }
+
+#status {
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.6); font-size:11px; letter-spacing:3px;
+    text-transform:uppercase; text-align:center; line-height:1.8;
+}
+#info {
+    position:fixed; top:20px; right:20px;
+    color:rgba(200,184,154,0.35); font-size:10px;
+    letter-spacing:1px; line-height:2; text-align:right;
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="status">Cliquez un personnage</div>
+<div id="info">Clic droit + drag : orbiter<br>Molette : zoom</div>
+
+<div id="ui">
+    <button class="btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf">♂ Ranger</button>
+    <button class="btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Peasant.gltf">♂ Peasant</button>
+    <button class="btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Ranger.gltf">♀ Ranger</button>
+    <button class="btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf">♀ Peasant</button>
+    <button class="btn" data-src="https://threejs.org/examples/models/gltf/Soldier.glb">Soldier (CDN)</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── Scène ────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111418);
+scene.fog = new THREE.Fog(0x111418, 15, 35);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 1.2, 3.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1;
+controls.maxDistance = 8;
+controls.update();
+
+// ── Lumières ─────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffd8a0, 0.5));
+
+const dir = new THREE.DirectionalLight(0xfff4e0, 3.0);
+dir.position.set(3, 6, 4);
+dir.castShadow = true;
+dir.shadow.mapSize.set(1024, 1024);
+scene.add(dir);
+
+const fill = new THREE.DirectionalLight(0x8090b0, 0.8);
+fill.position.set(-3, 2, -3);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0xffaa44, 1.2);
+rim.position.set(0, 3, -5);
+scene.add(rim);
+
+// ── Sol ──────────────────────────────────────────────────────────
+const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(5, 48),
+    new THREE.MeshStandardMaterial({ color: 0x1e1a14, roughness: 0.9 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Cercle décoratif
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.9, 0.95, 64),
+    new THREE.MeshBasicMaterial({ color: 0x3a2e1a, side: THREE.DoubleSide })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.001;
+scene.add(ring);
+
+// ── Chargement ───────────────────────────────────────────────────
+let current = null;
+const loader = new GLTFLoader();
+
+function loadCharacter(url, btn) {
+    document.getElementById('status').textContent = 'Chargement...';
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (current) { scene.remove(current); current = null; }
+
+    loader.load(url, (gltf) => {
+        const model = gltf.scene;
+
+        // Calibrer la hauteur à 1.75m
+        model.position.set(0, 0, 0);
+        const box    = new THREE.Box3().setFromObject(model);
+        const height = box.max.y - box.min.y;
+        model.scale.setScalar(1.75 / height);
+        box.setFromObject(model);
+        model.position.y = -box.min.y;
+
+        model.traverse(c => {
+            if (c.isMesh) {
+                c.castShadow    = true;
+                c.receiveShadow = true;
+            }
+        });
+
+        scene.add(model);
+        current = model;
+
+        // Infos
+        const clips = gltf.animations.map(a => a.name).join(', ') || 'aucune';
+        const meshCount = [...model.children].filter(c => c.isMesh).length;
+        document.getElementById('status').textContent =
+            url.split('/').pop() + '\nAnimations : ' + clips;
+
+        console.log('Chargé :', url);
+        console.log('Animations :', gltf.animations.map(a => a.name));
+
+    }, (xhr) => {
+        const pct = xhr.total ? Math.round(xhr.loaded / xhr.total * 100) : '...';
+        document.getElementById('status').textContent = 'Chargement ' + pct + '%';
+    }, (err) => {
+        document.getElementById('status').textContent = 'Erreur : ' + err.message;
+        console.error(err);
+    });
+}
+
+document.querySelectorAll('.btn').forEach(btn => {
+    btn.addEventListener('click', () => loadCharacter(btn.dataset.src, btn));
+});
+
+// Charger le Male_Ranger par défaut
+document.querySelector('.btn').click();
+
+// ── Boucle ───────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
