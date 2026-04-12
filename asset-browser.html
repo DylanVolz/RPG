@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Asset Browser — RPG Dark Fantasy</title>
+<title>Asset Browser — Three.js Game Editor</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
@@ -10,13 +10,14 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
 
 /* ── Sidebar ── */
 #sidebar {
-    width:280px; flex-shrink:0; background:#080a0c;
+    width:340px; flex-shrink:0; background:#080a0c;
     border-right:1px solid rgba(200,184,154,0.08);
     display:flex; flex-direction:column; overflow:hidden;
 }
 #sidebar-header {
-    padding:14px 14px 10px;
+    padding:12px 12px 10px;
     border-bottom:1px solid rgba(200,184,154,0.08);
+    flex-shrink:0;
 }
 #sidebar-title {
     font-size:9px; letter-spacing:4px; text-transform:uppercase;
@@ -24,71 +25,116 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
 }
 
 /* Tabs */
-#tabs { display:flex; gap:2px; }
+#tabs { display:flex; gap:2px; flex-wrap:wrap; }
 .tab {
-    flex:1; padding:7px 4px; font-size:9px; letter-spacing:1px;
+    flex:1; min-width:0; padding:6px 4px; font-size:8px; letter-spacing:1px;
     text-transform:uppercase; text-align:center; cursor:pointer;
     background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.1);
-    color:rgba(200,184,154,0.4); transition:all 0.12s;
+    color:rgba(200,184,154,0.4); transition:all 0.12s; white-space:nowrap;
 }
 .tab:hover  { background:rgba(200,184,154,0.08); color:rgba(200,184,154,0.7); }
 .tab.active { background:rgba(200,184,154,0.14); color:#c8b89a;
               border-color:rgba(200,184,154,0.35); }
 
 /* Search */
-#search-wrap { padding:8px; border-bottom:1px solid rgba(200,184,154,0.06); }
+#search-wrap { padding:7px 8px; border-bottom:1px solid rgba(200,184,154,0.06); flex-shrink:0; }
 #search {
     width:100%; background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.1);
-    color:#c8b89a; padding:8px 10px; font-family:'Georgia',serif;
+    color:#c8b89a; padding:7px 10px; font-family:'Georgia',serif;
     font-size:10px; letter-spacing:1px; outline:none;
 }
 #search::placeholder { color:rgba(200,184,154,0.2); }
 #search:focus { border-color:rgba(200,184,154,0.3); }
 
-/* Model list */
-#model-list { overflow-y:auto; max-height:40vh; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
-.model-item {
-    padding:8px 14px; font-size:10px; letter-spacing:0.5px;
-    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
-    transition:background 0.1s; display:flex; align-items:center; gap:8px;
+/* Thumbnail grid */
+#model-grid {
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap:4px;
+    padding:6px;
+    overflow-y:auto;
+    flex:1;
+    scrollbar-width:thin; scrollbar-color:#2a2418 transparent;
+    align-content: start;
 }
-.model-item:hover  { background:rgba(200,184,154,0.07); }
-.model-item.active { background:rgba(200,184,154,0.14); color:#fff; }
-.model-item .icon  { font-size:11px; opacity:0.5; flex-shrink:0; }
+.thumb-card {
+    cursor:pointer;
+    border:1px solid rgba(200,184,154,0.08);
+    background:rgba(0,0,0,0.3);
+    display:flex; flex-direction:column; align-items:center;
+    padding:4px 4px 5px;
+    transition:border-color 0.12s, background 0.12s;
+    position:relative; overflow:hidden;
+}
+.thumb-card:hover {
+    border-color:rgba(200,184,154,0.28);
+    background:rgba(200,184,154,0.04);
+}
+.thumb-card.active {
+    border-color:rgba(212,168,75,0.55);
+    background:rgba(212,168,75,0.05);
+}
+.thumb-img {
+    width:100%; aspect-ratio:1; display:block;
+    object-fit:cover; background:#0a0c0f;
+}
+.thumb-card.loading .thumb-img {
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(200,184,154,0.03) 0px, rgba(200,184,154,0.03) 4px,
+        transparent 4px, transparent 8px
+    );
+}
+.thumb-card.thumb-error .thumb-img {
+    background:#0a0c0f;
+}
+.thumb-card.thumb-error::before {
+    content:'⚠';
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-70%);
+    font-size:16px; opacity:0.2;
+}
+.thumb-name {
+    font-size:8px; letter-spacing:0.3px;
+    color:rgba(200,184,154,0.45); text-align:center;
+    margin-top:4px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    max-width:100%; width:100%;
+}
+.thumb-card.active .thumb-name { color:rgba(212,168,75,0.8); }
+
 #model-count {
-    padding:7px 14px; font-size:9px; letter-spacing:2px;
-    color:rgba(200,184,154,0.2); border-top:1px solid rgba(200,184,154,0.06);
+    padding:6px 10px; font-size:9px; letter-spacing:2px;
+    color:rgba(200,184,154,0.2);
+    border-top:1px solid rgba(200,184,154,0.06);
+    flex-shrink:0;
 }
 
-/* ── Anim panel (bas de sidebar pour personnages) ── */
+/* ── Anim panel ── */
 #anim-panel {
     border-top:1px solid rgba(200,184,154,0.08);
-    display:none; flex-direction:column; flex:1; min-height:0;
+    display:none; flex-direction:column; max-height:40%;
+    flex-shrink:0;
 }
 #anim-header {
-    padding:8px 14px; font-size:9px; letter-spacing:3px;
+    padding:7px 12px; font-size:9px; letter-spacing:3px;
     text-transform:uppercase; color:rgba(200,184,154,0.3);
-    display:flex; align-items:center; justify-content:space-between;
-}
-#ual-toggle { display:flex; gap:4px; }
-.ual-btn {
-    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
-    color:rgba(200,184,154,0.5); padding:3px 8px; font-size:9px;
-    letter-spacing:1px; cursor:pointer; transition:all 0.1s;
-}
-.ual-btn:hover, .ual-btn.active {
-    background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4);
+    flex-shrink:0;
 }
 #anim-search {
     background:rgba(200,184,154,0.04); border:none;
     border-bottom:1px solid rgba(200,184,154,0.08);
-    color:#c8b89a; padding:7px 14px; font-family:'Georgia',serif;
+    color:#c8b89a; padding:7px 12px; font-family:'Georgia',serif;
     font-size:10px; letter-spacing:1px; outline:none; width:100%;
+    flex-shrink:0;
 }
 #anim-search::placeholder { color:rgba(200,184,154,0.2); }
-#clip-list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+#clip-list {
+    overflow-y:auto; flex:1;
+    scrollbar-width:thin; scrollbar-color:#2a2418 transparent;
+}
 .clip-item {
-    padding:6px 14px; font-size:10px; letter-spacing:0.3px;
+    padding:6px 12px; font-size:9px; letter-spacing:0.3px;
     cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
     transition:background 0.1s; display:flex; justify-content:space-between;
 }
@@ -143,14 +189,12 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
     <div id="search-wrap">
         <input id="search" type="text" placeholder="Filtrer...">
     </div>
-    <div id="model-list"></div>
+    <div id="model-grid"></div>
     <div id="model-count">—</div>
 
     <!-- Panel animations (personnages seulement) -->
     <div id="anim-panel">
-        <div id="anim-header">
-            <span>Animations</span>
-        </div>
+        <div id="anim-header">Animations</div>
         <input id="anim-search" type="text" placeholder="Filtrer clips...">
         <div id="clip-list"></div>
     </div>
@@ -249,12 +293,8 @@ const CATALOG = {
     ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
 };
 
-const CAT_ICONS = {
-    'Personnages': '♟', 'Cheveux': '✂', 'Nature': '🌿', 'Bâtiments': '🏠', 'Props': '⚔'
-};
-
 // ═══════════════════════════════════════════════════════════════
-//  SCÈNE THREE.JS
+//  SCÈNE PRINCIPALE
 // ═══════════════════════════════════════════════════════════════
 const vp = document.getElementById('viewport');
 const scene = new THREE.Scene();
@@ -280,64 +320,167 @@ controls.minDistance = 0.3;
 controls.maxDistance = 80;
 controls.update();
 
-// Lumières
 scene.add(new THREE.AmbientLight(0xffd8a0, 0.6));
 const sun = new THREE.DirectionalLight(0xfff4d0, 2.5);
 sun.position.set(5, 8, 4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 60;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 60;
 sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
 sun.shadow.camera.top  =  20; sun.shadow.camera.bottom = -20;
 scene.add(sun);
 const fill = new THREE.DirectionalLight(0x8090b0, 0.7);
-fill.position.set(-4, 3, -4);
-scene.add(fill);
+fill.position.set(-4, 3, -4); scene.add(fill);
 const rim = new THREE.DirectionalLight(0xffaa44, 0.9);
-rim.position.set(0, 4, -6);
-scene.add(rim);
+rim.position.set(0, 4, -6); scene.add(rim);
 
-// Sol
 const floor = new THREE.Mesh(
     new THREE.CircleGeometry(30, 64),
     new THREE.MeshStandardMaterial({ color: 0x181410, roughness: 0.95 })
 );
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
 const ring = new THREE.Mesh(
     new THREE.RingGeometry(1.2, 1.27, 72),
     new THREE.MeshBasicMaterial({ color: 0x3a2e1a, side: THREE.DoubleSide })
 );
-ring.rotation.x = -Math.PI / 2;
-ring.position.y = 0.002;
-scene.add(ring);
+ring.rotation.x = -Math.PI / 2; ring.position.y = 0.002; scene.add(ring);
 
-// Grille subtile
 const grid = new THREE.GridHelper(20, 20, 0x201810, 0x1a140c);
-grid.position.y = 0.001;
-scene.add(grid);
+grid.position.y = 0.001; scene.add(grid);
 
 // ═══════════════════════════════════════════════════════════════
-//  ÉTAT
+//  RENDERER OFFSCREEN — génération des thumbnails
 // ═══════════════════════════════════════════════════════════════
-const loader   = new GLTFLoader();
+const THUMB_SIZE = 128;
+const thumbR = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+thumbR.setSize(THUMB_SIZE, THUMB_SIZE);
+thumbR.setPixelRatio(1);
+thumbR.outputColorSpace = THREE.SRGBColorSpace;
+
+const thumbScene = new THREE.Scene();
+thumbScene.background = new THREE.Color(0x0d1014);
+const thumbCam = new THREE.PerspectiveCamera(42, 1, 0.01, 300);
+
+thumbScene.add(new THREE.AmbientLight(0xffd8a0, 0.9));
+const tSun = new THREE.DirectionalLight(0xffffff, 2.8);
+tSun.position.set(3, 5, 3); thumbScene.add(tSun);
+const tFill = new THREE.DirectionalLight(0x8090c0, 0.6);
+tFill.position.set(-3, 2, -2); thumbScene.add(tFill);
+const tRim = new THREE.DirectionalLight(0xffaa44, 0.8);
+tRim.position.set(0, 3, -5); thumbScene.add(tRim);
+
+const gltfLoader = new GLTFLoader();
+const _gltfCache = {};
+
+function loadGLTF(url) {
+    if (_gltfCache[url]) return Promise.resolve(_gltfCache[url]);
+    return new Promise((res, rej) =>
+        gltfLoader.load(url, g => { _gltfCache[url] = g; res(g); }, undefined, rej)
+    );
+}
+
+let _thumbRoot = null;
+function _clearThumbScene() {
+    if (!_thumbRoot) return;
+    thumbScene.remove(_thumbRoot);
+    _thumbRoot.traverse(n => {
+        if (n.geometry) n.geometry.dispose();
+        if (n.material) {
+            (Array.isArray(n.material) ? n.material : [n.material])
+                .forEach(m => m?.dispose());
+        }
+    });
+    _thumbRoot = null;
+}
+
+async function renderThumb(item) {
+    _clearThumbScene();
+    const gltf = await loadGLTF(item.src);
+    const root = gltf.scene.clone(true);
+    root.traverse(c => {
+        if (!c.isMesh) return;
+        c.frustumCulled = false;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(m => { if (m) { m.side = THREE.DoubleSide; m.clippingPlanes = []; } });
+    });
+
+    // Normaliser la taille à 2 unités
+    const box0 = new THREE.Box3().setFromObject(root);
+    const size0 = box0.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size0.x, size0.y, size0.z) || 1;
+    root.scale.setScalar(2 / maxDim);
+
+    // Centrer
+    const box1 = new THREE.Box3().setFromObject(root);
+    const center = box1.getCenter(new THREE.Vector3());
+    root.position.sub(center);
+
+    thumbScene.add(root);
+    _thumbRoot = root;
+
+    // Caméra légèrement au-dessus et de face
+    const dist = 3.2;
+    thumbCam.position.set(dist * 0.5, dist * 0.35, dist);
+    thumbCam.lookAt(0, 0, 0);
+    thumbCam.updateProjectionMatrix();
+
+    thumbR.render(thumbScene, thumbCam);
+    return thumbR.domElement.toDataURL('image/jpeg', 0.85);
+}
+
+// Queue séquentielle avec IntersectionObserver
+const _thumbQueue = [];
+let _thumbBusy = false;
+
+async function _processQueue() {
+    if (_thumbBusy) return;
+    _thumbBusy = true;
+    while (_thumbQueue.length > 0) {
+        const { item, card, img } = _thumbQueue.shift();
+        if (!card.isConnected) continue;
+        try {
+            const url = await renderThumb(item);
+            img.src = url;
+            card.classList.remove('loading');
+        } catch {
+            card.classList.remove('loading');
+            card.classList.add('thumb-error');
+        }
+    }
+    _thumbBusy = false;
+}
+
+const _thumbObserver = new IntersectionObserver(entries => {
+    let added = false;
+    for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        _thumbObserver.unobserve(e.target);
+        const card = e.target;
+        if (card._thumbDone) continue;
+        card._thumbDone = true;
+        const img = card.querySelector('.thumb-img');
+        _thumbQueue.push({ item: card._item, card, img });
+        added = true;
+    }
+    if (added) _processQueue();
+}, { root: document.getElementById('model-grid'), rootMargin: '80px' });
+
+// ═══════════════════════════════════════════════════════════════
+//  ÉTAT SCÈNE PRINCIPALE
+// ═══════════════════════════════════════════════════════════════
 let currentMdl = null, mixer = null, activeAction = null;
 let ualLoaded  = false;
 let allClips   = [], animFilter = '';
 let bodyClipPlane = null, headBone = null;
 const headBoneWP  = new THREE.Vector3();
 
-// ── Chargement UAL (toutes libs fusionnées, lazy) ─────────────
 async function loadUAL() {
     if (ualLoaded) return;
     allClips = [];
     document.getElementById('clip-list').innerHTML =
-        '<div style="padding:8px 14px;font-size:9px;opacity:.3;letter-spacing:2px">CHARGEMENT ANIMATIONS...</div>';
-    const results = await Promise.allSettled(
-        UAL_PATHS.map(p => new Promise((res, rej) => loader.load(p, res, undefined, rej)))
-    );
+        '<div style="padding:8px 14px;font-size:9px;opacity:.3;letter-spacing:2px">CHARGEMENT...</div>';
+    const results = await Promise.allSettled(UAL_PATHS.map(p => loadGLTF(p)));
     const clipMap = new Map();
     for (const r of results) {
         if (r.status === 'fulfilled') {
@@ -350,38 +493,27 @@ async function loadUAL() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ATTACHEMENT CORPS DE BASE (même logique que character.js)
+//  ATTACHEMENT CORPS DE BASE
 // ═══════════════════════════════════════════════════════════════
 const HEAD_MESHES = new Set(['Eyebrows', 'Eyes', 'SuperHero_Male', 'SuperHero_Female']);
 
 function attachBody(baseGltf, outfitRoot) {
     bodyClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     headBone = null;
-
-    // Table des os de l'outfit
     const outfitBones = {};
     outfitRoot.traverse(n => { if (n.isBone) outfitBones[n.name] = n; });
-
-    // Trouver l'os head pour ancrer le clip plane
     headBone = outfitBones['head'] || outfitBones['Head'] || null;
 
-    // 1re passe : collecter les meshes du corps
     const toAttach = [];
     baseGltf.scene.traverse(n => {
         if (n.isSkinnedMesh && HEAD_MESHES.has(n.name)) toAttach.push(n);
     });
-
-    // 2e passe : rebind + ajout
     for (const node of toAttach) {
         const newBones = node.skeleton.bones.map(b => outfitBones[b.name]);
         if (newBones.some(b => !b)) continue;
-
         const newSkeleton = new THREE.Skeleton(newBones, node.skeleton.boneInverses);
-        node.position.set(0, 0, 0);
-        node.rotation.set(0, 0, 0);
-        node.scale.set(1, 1, 1);
+        node.position.set(0,0,0); node.rotation.set(0,0,0); node.scale.set(1,1,1);
         node.bind(newSkeleton, new THREE.Matrix4());
-
         const isBody = node.name === 'SuperHero_Male' || node.name === 'SuperHero_Female';
         const clonedMats = (Array.isArray(node.material) ? node.material : [node.material])
             .map(m => m ? m.clone() : m);
@@ -390,29 +522,25 @@ function attachBody(baseGltf, outfitRoot) {
             m.side = THREE.DoubleSide;
             if (isBody) m.clippingPlanes = [bodyClipPlane];
         }
-        node.castShadow    = true;
-        node.frustumCulled = false;
+        node.castShadow = true; node.frustumCulled = false;
         outfitRoot.add(node);
     }
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CHARGEMENT MODÈLE
+//  CHARGEMENT MODÈLE (viewport principal)
 // ═══════════════════════════════════════════════════════════════
 function loadModel(item) {
-    // Nettoyer
     if (activeAction) { activeAction.stop(); activeAction = null; }
-    if (mixer)        { mixer.stopAllAction(); mixer = null; }
+    if (mixer)        { mixer.stopAllActions(); mixer = null; }
     if (currentMdl)   { scene.remove(currentMdl._root); currentMdl = null; }
     bodyClipPlane = null; headBone = null;
 
     document.getElementById('vp-loading').style.display = 'block';
     document.getElementById('vp-label').textContent = item.name;
 
-    const pOutfit = new Promise((res, rej) => loader.load(item.src, res, undefined, rej));
-    const pBody   = item.bodyUrl
-        ? new Promise((res, rej) => loader.load(item.bodyUrl, res, undefined, rej))
-        : Promise.resolve(null);
+    const pOutfit = loadGLTF(item.src);
+    const pBody   = item.bodyUrl ? loadGLTF(item.bodyUrl) : Promise.resolve(null);
 
     Promise.all([pOutfit, pBody]).then(([gltf, bodyGltf]) => {
         document.getElementById('vp-loading').style.display = 'none';
@@ -422,30 +550,23 @@ function loadModel(item) {
             : gltf.scene.clone(true);
 
         root.traverse(c => {
-            if (c.isMesh) {
-                c.castShadow = true;
-                c.receiveShadow = true;
-                c.frustumCulled = false;
-                const mats = Array.isArray(c.material) ? c.material : [c.material];
-                mats.forEach(m => { if (m) m.side = THREE.DoubleSide; });
-            }
+            if (!c.isMesh) return;
+            c.castShadow = c.receiveShadow = true;
+            c.frustumCulled = false;
+            (Array.isArray(c.material) ? c.material : [c.material])
+                .forEach(m => { if (m) m.side = THREE.DoubleSide; });
         });
 
-        // Calibrer à 1.75m
         const box0 = new THREE.Box3().setFromObject(root);
-        const h0   = box0.max.y - box0.min.y;
-        root.scale.setScalar(1.75 / h0);
-
+        root.scale.setScalar(1.75 / (box0.max.y - box0.min.y || 1));
         if (bodyGltf) attachBody(bodyGltf, root);
-
         scene.add(root);
 
-        // Poser sur le sol + auto-fit caméra
-        const box = new THREE.Box3().setFromObject(root);
+        const box  = new THREE.Box3().setFromObject(root);
         root.position.y -= box.min.y;
         const size   = box.getSize(new THREE.Vector3());
-        const center = new THREE.Vector3(0, size.y * 0.5, 0);
         const maxDim = Math.max(size.x, size.y, size.z);
+        const center = new THREE.Vector3(0, size.y * 0.5, 0);
 
         controls.target.copy(center);
         const dist = maxDim * 1.8;
@@ -455,24 +576,20 @@ function loadModel(item) {
         controls.update();
 
         currentMdl = { _root: root, _animated: !!item.animated };
-
         document.getElementById('anim-panel').style.display =
             item.animated ? 'flex' : 'none';
 
         if (item.animated) {
             mixer = new THREE.AnimationMixer(root);
-            if (ualLoaded) rebuildClips();
-            else loadUAL();
+            if (ualLoaded) rebuildClips(); else loadUAL();
         }
-
     }).catch(err => {
         document.getElementById('vp-loading').style.display = 'none';
         document.getElementById('vp-label').textContent = '⚠ ' + err.message;
-        console.error(err);
     });
 }
 
-// ── Rebuild clip list ─────────────────────────────────────────
+// ── Clips ──────────────────────────────────────────────────────
 function rebuildClips() {
     if (!ualLoaded || !mixer) return;
     renderClipList();
@@ -490,7 +607,6 @@ function renderClipList() {
     for (const clip of list) {
         const div = document.createElement('div');
         div.className = 'clip-item';
-        div.dataset.name = clip.name;
         div.innerHTML = `<span>${clip.name}</span><span class="dur">${clip.duration.toFixed(2)}s</span>`;
         div.addEventListener('click', () => {
             document.querySelectorAll('.clip-item').forEach(b => b.classList.remove('active'));
@@ -507,34 +623,48 @@ function playClip(clip) {
     const action = mixer.clipAction(clip);
     action.reset().fadeIn(0.2).play();
     activeAction = action;
-    document.getElementById('vp-label').textContent =
-        document.querySelector('.model-item.active')?.textContent?.trim() + '\n' + clip.name;
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  UI — LISTE MODÈLES
+//  UI — GRILLE DE THUMBNAILS
 // ═══════════════════════════════════════════════════════════════
 let currentCat = 'Personnages';
 let searchTerm = '';
 
-function renderList() {
-    const items = CATALOG[currentCat] || [];
-    const term  = searchTerm.toLowerCase();
+function renderGrid() {
+    const items    = CATALOG[currentCat] || [];
+    const term     = searchTerm.toLowerCase();
     const filtered = items.filter(i => !term || i.name.toLowerCase().includes(term));
 
-    const el = document.getElementById('model-list');
+    const el = document.getElementById('model-grid');
     el.innerHTML = '';
+
     for (const item of filtered) {
-        const div = document.createElement('div');
-        div.className = 'model-item';
-        div.innerHTML = `<span class="icon">${CAT_ICONS[currentCat]||'◆'}</span><span>${item.name}</span>`;
-        div.addEventListener('click', () => {
-            document.querySelectorAll('.model-item').forEach(b => b.classList.remove('active'));
-            div.classList.add('active');
+        const card = document.createElement('div');
+        card.className = 'thumb-card loading';
+        card._item = item;
+
+        const img = document.createElement('img');
+        img.className = 'thumb-img';
+        img.alt = item.name;
+
+        const label = document.createElement('div');
+        label.className = 'thumb-name';
+        label.textContent = item.name;
+
+        card.appendChild(img);
+        card.appendChild(label);
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
             loadModel(item);
         });
-        el.appendChild(div);
+        el.appendChild(card);
+
+        // Thumbnail générée dès que la card est visible
+        _thumbObserver.observe(card);
     }
+
     document.getElementById('model-count').textContent =
         filtered.length + ' / ' + items.length + ' assets';
 }
@@ -547,29 +677,23 @@ document.querySelectorAll('.tab').forEach(tab => {
         currentCat = tab.dataset.cat;
         document.getElementById('search').value = '';
         searchTerm = '';
-        renderList();
-        // Masquer panel anim si pas personnage
-        if (currentCat !== 'Personnages') {
+        if (currentCat !== 'Personnages')
             document.getElementById('anim-panel').style.display = 'none';
-        }
+        renderGrid();
     });
 });
 
-// Recherche
 document.getElementById('search').addEventListener('input', e => {
     searchTerm = e.target.value;
-    renderList();
+    renderGrid();
 });
 
-
-// Anim search
 document.getElementById('anim-search').addEventListener('input', e => {
     animFilter = e.target.value;
     renderClipList();
 });
 
-// Init
-renderList();
+renderGrid();
 
 // ═══════════════════════════════════════════════════════════════
 //  BOUCLE
@@ -579,7 +703,6 @@ const clock = new THREE.Clock();
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
     if (mixer) mixer.update(delta);
-    // Clip plane tête : 0.22m sous l'os head
     if (bodyClipPlane && headBone) {
         headBone.getWorldPosition(headBoneWP);
         bodyClipPlane.constant = -(headBoneWP.y - 0.22);
