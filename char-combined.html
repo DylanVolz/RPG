@@ -79,10 +79,10 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
     <!-- Outfit -->
     <div class="section-title">Personnage</div>
     <div class="btn-group" id="outfit-btns">
-        <div class="sel-btn active" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf">♂ Ranger</div>
-        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Peasant.gltf">♂ Peasant</div>
-        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Ranger.gltf">♀ Ranger</div>
-        <div class="sel-btn" data-src="Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf">♀ Peasant</div>
+        <div class="sel-btn active" data-src="assets/characters/outfits/Male_Ranger.gltf">♂ Ranger</div>
+        <div class="sel-btn" data-src="assets/characters/outfits/Male_Peasant.gltf">♂ Peasant</div>
+        <div class="sel-btn" data-src="assets/characters/outfits/Female_Ranger.gltf">♀ Ranger</div>
+        <div class="sel-btn" data-src="assets/characters/outfits/Female_Peasant.gltf">♀ Peasant</div>
     </div>
 
     <!-- Librairie d'animation -->
@@ -168,8 +168,8 @@ let currentModel = null, mixer = null, activeAction = null;
 let allClips = [], filterTerm = '';
 
 const UAL_PATHS = {
-    1: 'Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb',
-    2: 'Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb',
+    1: 'assets/characters/animations/UAL1_Standard.glb',
+    2: 'assets/characters/animations/UAL2_Standard.glb',
 };
 
 let currentOutfitSrc = document.querySelector('#outfit-btns .sel-btn').dataset.src;

@@ -52,8 +52,13 @@ export function resolveCharConfig(name = null) {
     }
 
     const body       = c?.body       || 'M';
-    const outfit     = (c?.outfit != null && c.outfit !== '') ? c.outfit : 'Male_Ranger';
     const texVariant = c?.texVariant || 1;
+
+    // Normalisation rétro-compat : les anciennes configs stockaient le chemin
+    // Quaternius complet (ex. "Modular Character.../Outfits/Female_Ranger.gltf").
+    // On extrait juste le nom de fichier sans extension.
+    const _rawOutfit = (c?.outfit != null && c.outfit !== '') ? c.outfit : 'Male_Ranger';
+    const outfit = _rawOutfit.replace(/\\/g, '/').split('/').pop().replace(/\.gltf$/i, '');
 
     // URL texture variante (null si variant 1 = défaut du gltf)
     const outfitType = outfit.replace(/^(Male|Female)_/, '').replace(/_Cloth$/, '');
