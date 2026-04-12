@@ -30,3 +30,7 @@ _source/
 screenshots_debug/
 *.bak
 .claude/
+
+# ── Build / distribution ─────────────────────────────────────────────────────
+DarkRPG.exe
+node_modules/
