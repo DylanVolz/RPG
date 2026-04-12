@@ -456,8 +456,10 @@ sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 30;
 sun.shadow.camera.left = sun.shadow.camera.bottom = -6;
 sun.shadow.camera.right = sun.shadow.camera.top   =  6;
 scene.add(sun);
-scene.add(Object.assign(new THREE.DirectionalLight(0x8090c0, 0.5), {position: new THREE.Vector3(-4,3,-3)}));
-scene.add(Object.assign(new THREE.DirectionalLight(0xffaa44, 0.7), {position: new THREE.Vector3(0,5,-5)}));
+const fillLight = new THREE.DirectionalLight(0x8090c0, 0.5);
+fillLight.position.set(-4, 3, -3); scene.add(fillLight);
+const backLight = new THREE.DirectionalLight(0xffaa44, 0.7);
+backLight.position.set(0, 5, -5); scene.add(backLight);
 
 const floorMesh = new THREE.Mesh(
     new THREE.CircleGeometry(12, 48),

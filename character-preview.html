@@ -151,8 +151,10 @@ scene.add(new THREE.AmbientLight(0xffd8a0, 0.55));
 const sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
 sun.position.set(3, 6, 4); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
-scene.add(Object.assign(new THREE.DirectionalLight(0x8090b0, 0.8), { position: new THREE.Vector3(-3, 2, -3) }));
-scene.add(Object.assign(new THREE.DirectionalLight(0xffaa44, 1.2), { position: new THREE.Vector3(0, 3, -5) }));
+const fillLight = new THREE.DirectionalLight(0x8090b0, 0.8);
+fillLight.position.set(-3, 2, -3); scene.add(fillLight);
+const backLight = new THREE.DirectionalLight(0xffaa44, 1.2);
+backLight.position.set(0, 3, -5); scene.add(backLight);
 
 // Sol
 const floor = new THREE.Mesh(
