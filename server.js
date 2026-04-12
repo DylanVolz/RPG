@@ -11,6 +11,7 @@ const path  = require('path');
 const { exec } = require('child_process');
 
 const PORT = 3000;
+process.title = 'Dark RPG — Studio';
 
 // Quand compilé avec pkg, process.execPath = chemin du .exe
 // Quand lancé avec node, __filename = chemin du script
