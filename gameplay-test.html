@@ -1694,7 +1694,7 @@ async function hotReloadCharacter(cfg = null) {
     STATE.combatMode = 0; STATE.inCombatStance = false; STATE.blocking = false;
 
     // 2. Supprimer l'ancien personnage de la scène
-    if (mixer) { mixer.stopAllActions(); mixer = null; }
+    if (mixer) { try { mixer.stopAllActions(); } catch(e) {} mixer = null; }
     scene.remove(charRoot);
     charRoot.traverse(n => {
         if (n.isMesh || n.isSkinnedMesh) {

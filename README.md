@@ -97,16 +97,13 @@ Assemble modular characters from Quaternius outfit parts with per-zone color sha
 
 ---
 
-### `char-combined.html` — Combined Builder + Preview
-Character builder and full-body preview side by side.
-
----
-
 ### `character-preview.html` — Character Preview
-Preview a fully assembled character with animations playing.
+Preview a fully assembled character (outfit, hair, beard) with animations playing.
 
 - **Right-click + drag** — orbit camera
 - **Scroll wheel** — zoom
+- Left panel: switch between saved characters
+- Animations play automatically (Idle, Walk, Run, Jump, Attack…)
 
 ---
 
@@ -124,6 +121,16 @@ Browse all loaded Quaternius assets (characters, props, environment).
 - **Left panel** — filter by category / search by name
 - **Right panel** — 3D preview with orbit controls
 - **Right-click + drag** — orbit · **Scroll** — zoom
+
+---
+
+### `grip-editor.html` — Grip Editor
+Fine-tune the position, rotation, and scale of each equipped weapon or tool on the character skeleton.
+
+- Select a saved character and a weapon from the left panel
+- Adjust grip with sliders (position X/Y/Z, rotation X/Y/Z, scale)
+- **Right-click + drag** — orbit · **Scroll** — zoom
+- Changes are saved automatically and shared with **Gameplay Test**
 
 ---
 

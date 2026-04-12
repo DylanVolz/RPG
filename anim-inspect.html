@@ -93,7 +93,7 @@ async function loadAllAnims() {
     document.getElementById('list').innerHTML = '';
     document.getElementById('count').textContent = '';
     if (active) { active.stop(); active = null; }
-    if (mixer)  { mixer.stopAllActions(); mixer = null; }
+    if (mixer)  { try { mixer.stopAllActions(); } catch(e) {} mixer = null; }
     if (currentModel) { scene.remove(currentModel); currentModel = null; }
 
     // Charger le modèle depuis le premier GLB disponible

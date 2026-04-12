@@ -255,7 +255,10 @@ async function loadChar(cfg) {
     document.getElementById('vp-status').textContent = 'Chargement…';
 
     if (charRoot) { scene.remove(charRoot); charRoot = null; }
-    if (mixer)    { mixer.stopAllActions(); mixer = null; activeAction = null; }
+    if (mixer) {
+        try { mixer.stopAllActions(); } catch(e) { console.warn('[CharPreview] stopAllActions:', e.message); }
+        mixer = null; activeAction = null;
+    }
 
     try {
         const urls = [cfg.meshUrl, cfg.baseUrl];
