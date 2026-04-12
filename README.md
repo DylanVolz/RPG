@@ -72,6 +72,7 @@ Full gameplay prototype — locomotion, combat, physics, town.
 | Space | Jump |
 | C | Crouch / Slide (while sprinting) |
 | R | Roll |
+| Q | Guard / Block (hold) — lean camera left |
 | Shift + Q / E | Dodge left / right |
 | F | Interact / Climb |
 | K | Kick |

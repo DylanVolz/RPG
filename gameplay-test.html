@@ -2514,8 +2514,10 @@ function _updateInner(delta) {
     const ctrlJust  = consumeKey('ControlLeft') || consumeKey('ControlRight');
     const fJust     = consumeKey('KeyF');
     const rJust     = consumeKey('KeyR');
-    const qJust = consumeKey('KeyQ') && shift;   // Shift+Q = esquive gauche
-    const eJust = consumeKey('KeyE') && shift;   // Shift+E = esquive droite
+    const qJust     = consumeKey('KeyQ') && shift;          // Shift+Q = esquive gauche
+    const eJust     = consumeKey('KeyE') && shift;          // Shift+E = esquive droite
+    const blockHeld = keys.has('KeyQ') && !shift;           // Q (sans Shift) = garde / block
+    const blockJust = consumeKey('KeyQ') && !shift;         // Q press = viser (magie/arc)
     const gHeld = keys.has('KeyG');
     const moving = fwd || bck || lft || rgt;
 
@@ -2540,8 +2542,8 @@ function _updateInner(delta) {
     if (consumeKey('Tab')) toggleCamLock();
     if (consumeKey('KeyV')) toggleCamMode();
 
-    // Lean (Q/E sans Shift)
-    CAM.leanTarget = (!shift && keys.has('KeyQ')) ? -1 : (!shift && keys.has('KeyE')) ? 1 : 0;
+    // Lean (Q/E sans Shift) — Q sert aussi de touche de garde en combat
+    CAM.leanTarget = blockHeld ? -1 : (!shift && keys.has('KeyE')) ? 1 : 0;
 
     // ── Si emote en cours, gestion limitée ────────────────────
     if (STATE.sitting || STATE.groundSitting) {
@@ -2795,7 +2797,7 @@ function _updateInner(delta) {
 
     // ── COUCHE 4 — COMBAT ──────────────────────────────────────
     if (kickCooldown > 0) kickCooldown -= delta;
-    if (STATE.inCombatStance) updateCombat(delta, mouseLJust, mouseRJust, mouseR);
+    if (STATE.inCombatStance) updateCombat(delta, mouseLJust, blockJust, blockHeld);
 
     // ── Sprint state machine ────────────────────────────────────
     // sprintState : 'off' | 'enter' | 'on' | 'exit'
