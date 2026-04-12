@@ -285,6 +285,7 @@ import * as THREE from 'three';
 import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { UAL_PATHS } from './src/char-loader.js';
 
 // ═══════════════════════════════════════════════════════════════
 //  CATALOGUE
@@ -297,12 +298,7 @@ const BASE_PROPS   = 'assets/environment/props/';
 const BASE_BODY_M  = 'assets/characters/bodies/Superhero_Male_FullBody.gltf';
 const BASE_BODY_F  = 'assets/characters/bodies/Superhero_Female_FullBody.gltf';
 
-const UAL_PATHS = [
-    'assets/characters/animations/UAL1_Standard.glb',
-    'assets/characters/animations/UAL1_Source.glb',
-    'assets/characters/animations/UAL2_Standard.glb',
-    'assets/characters/animations/UAL2_Source.glb',
-];
+// UAL_PATHS → src/char-loader.js
 
 // Couleur par catégorie principale
 const CAT_COLOR = {

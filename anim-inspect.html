@@ -43,6 +43,7 @@ canvas { border:1px solid rgba(200,184,154,0.1); }
 import * as THREE from 'three';
 import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { UAL_PATHS } from './src/char-loader.js';
 
 // ── Mini scène 3D ────────────────────────────────────────────────
 const W = Math.min(600, innerWidth - 60), H = 400;
@@ -79,12 +80,7 @@ scene.add(floor);
 // ── Chargement animations (toutes libs fusionnées) ───────────────
 let mixer = null, active = null, currentModel = null;
 
-const ANIM_PATHS = [
-    'assets/characters/animations/UAL1_Standard.glb',
-    'assets/characters/animations/UAL1_Source.glb',
-    'assets/characters/animations/UAL2_Standard.glb',
-    'assets/characters/animations/UAL2_Source.glb',
-];
+const ANIM_PATHS = UAL_PATHS; // → src/char-loader.js
 
 const loader = new GLTFLoader();
 

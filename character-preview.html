@@ -122,6 +122,7 @@ import { GLTFLoader }  from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { resolveCharConfig, getAllCharConfigs } from './src/char-config.js';
+import { UAL_PATHS, isHeadRelatedMesh, attachSkinned } from './src/char-loader.js';
 
 // ── Scène ────────────────────────────────────────────────────────
 const vp = document.getElementById('vp');
@@ -176,52 +177,9 @@ function loadGLTF(url) {
     return new Promise((res, rej) => gltfLoader.load(url, g => { cache[url] = g; res(g); }, undefined, rej));
 }
 
-// Détection par os (identique à char-builder) — indépendant du nom du mesh
-function isHeadRelatedMesh(node) {
-    return node.isSkinnedMesh &&
-        node.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
-}
-
-// Même logique que makeReboundMesh (char-builder) :
-// clone les matériaux, pas de bone fallback — os manquant = mesh ignoré avec warning
-function attachSkinned(srcGltf, outfitRoot, meshFilter) {
-    const boneMap = {};
-    outfitRoot.traverse(n => { if (n.isBone) boneMap[n.name] = n; });
-    if (!Object.keys(boneMap).length) return;
-
-    srcGltf.scene.traverse(srcNode => {
-        if (!srcNode.isSkinnedMesh) return;
-        if (meshFilter && !meshFilter(srcNode)) return;
-
-        const newBones = srcNode.skeleton.bones.map(b => boneMap[b.name] || null);
-        if (newBones.some(b => !b)) {
-            const missing = srcNode.skeleton.bones.filter(b => !boneMap[b.name]).map(b => b.name);
-            console.warn('[CharPreview] os manquants pour', srcNode.name, missing.slice(0,5));
-            return;
-        }
-
-        const clonedMats = (Array.isArray(srcNode.material)
-            ? srcNode.material : [srcNode.material])
-            .map(m => { const c = m ? m.clone() : m; if (c) c.side = THREE.DoubleSide; return c; });
-
-        const mesh = new THREE.SkinnedMesh(srcNode.geometry,
-            Array.isArray(srcNode.material) ? clonedMats : clonedMats[0]);
-        mesh.name = srcNode.name;
-        mesh.bindMode = srcNode.bindMode;
-        mesh.bind(new THREE.Skeleton(newBones, srcNode.skeleton.boneInverses), new THREE.Matrix4());
-        mesh.castShadow = true;
-        mesh.frustumCulled = false;
-        outfitRoot.add(mesh);
-    });
-}
+// isHeadRelatedMesh / attachSkinned / UAL_PATHS → src/char-loader.js
 
 // ── Animations ───────────────────────────────────────────────────
-const UAL_PATHS = [
-    'assets/characters/animations/UAL1_Standard.glb',
-    'assets/characters/animations/UAL1_Source.glb',
-    'assets/characters/animations/UAL2_Standard.glb',
-    'assets/characters/animations/UAL2_Source.glb',
-];
 const ANIM_PICK = {
     idle:   n => /idle_loop/i.test(n) || /\bidle\b/i.test(n),
     walk:   n => /walk_loop/i.test(n) || /\bwalk\b/i.test(n),

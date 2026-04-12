@@ -336,18 +336,14 @@ import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { LiveSync } from './src/live-sync.js';
+import { UAL_PATHS, isHeadRelatedMesh } from './src/char-loader.js';
 
 // ── Chemins ───────────────────────────────────────────────────
 const P_OUTFIT = 'assets/characters/outfits/';
 const P_HAIR   = 'assets/characters/hair/';
 const P_BODY   = { M:'assets/characters/bodies/Superhero_Male_FullBody.gltf',
                    F:'assets/characters/bodies/Superhero_Female_FullBody.gltf' };
-const P_UAL = [
-    'assets/characters/animations/UAL1_Standard.glb',
-    'assets/characters/animations/UAL1_Source.glb',
-    'assets/characters/animations/UAL2_Standard.glb',
-    'assets/characters/animations/UAL2_Source.glb',
-];
+const P_UAL = UAL_PATHS; // → src/char-loader.js
 
 // ── Scène ─────────────────────────────────────────────────────
 const vp = document.getElementById('viewport');
@@ -429,11 +425,7 @@ const HAIR_PRESETS = [
 ];
 
 // ── Détection générique par bones (fonctionne avec n'importe quel pack Quaternius) ──
-// Un mesh "tête-lié" : a neck_01 ou Head dans son squelette → attacher au bodyRoot
-function isHeadRelatedMesh(mesh) {
-    return mesh.isSkinnedMesh &&
-        mesh.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
-}
+// isHeadRelatedMesh → src/char-loader.js (importé)
 
 // Un mesh "corps complet" : a spine + neck/Head → reçoit le shader neck+head only
 // Distinct des yeux/sourcils qui n'ont que Head (sans spine)
