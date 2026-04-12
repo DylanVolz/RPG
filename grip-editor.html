@@ -353,7 +353,11 @@ const UAL_PATHS = [
     'assets/characters/animations/UAL2_Standard.glb',
     'assets/characters/animations/UAL2_Source.glb',
 ];
-const HEAD_MESHES = new Set(['Eyebrows','Eyes','SuperHero_Male','SuperHero_Female']);
+// Détection par os (identique à char-builder) — indépendant du nom du mesh
+function isHeadRelatedMesh(node) {
+    return node.isSkinnedMesh &&
+        node.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
+}
 
 // Groupes d'animations (ordre = priorité de classification)
 const ANIM_GROUPS = [
@@ -541,32 +545,40 @@ function handForKey(key) { return key ? WEAPON_DEFS[key]?.hand : null; }
 function stateForKey(key) { return key ? hands[handForKey(key)] : null; }
 
 // ═══════════════════════════════════════════════════════════════
-//  ATTACH SKINNED MESH (corps, tete, cheveux)
+//  ATTACH SKINNED MESH — même logique que makeReboundMesh (char-builder)
+//  • Clone les matériaux (évite la contamination entre persos)
+//  • Utilise les bones exacts de outfitRoot — pas de bone fallback approximatif
+//    (si un os manque, le mesh est ignoré avec un warning)
 // ═══════════════════════════════════════════════════════════════
 function attachSkinned(srcGltf, outfitRoot, meshFilter) {
-    const outfitBones = {};
-    outfitRoot.traverse(n => { if (n.isBone) outfitBones[n.name] = n; });
+    const boneMap = {};
+    outfitRoot.traverse(n => { if (n.isBone) boneMap[n.name] = n; });
+    if (!Object.keys(boneMap).length) return;
 
-    const fallback = outfitBones['Hips'] || outfitBones['Root']
-        || Object.values(outfitBones)[0] || null;
-    if (!fallback) return;
+    srcGltf.scene.traverse(srcNode => {
+        if (!srcNode.isSkinnedMesh) return;
+        if (meshFilter && !meshFilter(srcNode)) return;
 
-    const toAttach = [];
-    srcGltf.scene.traverse(n => {
-        if (n.isSkinnedMesh && (!meshFilter || meshFilter(n.name))) toAttach.push(n);
+        const newBones = srcNode.skeleton.bones.map(b => boneMap[b.name] || null);
+        if (newBones.some(b => !b)) {
+            const missing = srcNode.skeleton.bones.filter(b => !boneMap[b.name]).map(b => b.name);
+            console.warn('[GripEditor] os manquants pour', srcNode.name, missing.slice(0,5));
+            return;
+        }
+
+        const clonedMats = (Array.isArray(srcNode.material)
+            ? srcNode.material : [srcNode.material])
+            .map(m => { const c = m ? m.clone() : m; if (c) c.side = THREE.DoubleSide; return c; });
+
+        const mesh = new THREE.SkinnedMesh(srcNode.geometry,
+            Array.isArray(srcNode.material) ? clonedMats : clonedMats[0]);
+        mesh.name = srcNode.name;
+        mesh.bindMode = srcNode.bindMode;
+        mesh.bind(new THREE.Skeleton(newBones, srcNode.skeleton.boneInverses), new THREE.Matrix4());
+        mesh.castShadow = true;
+        mesh.frustumCulled = false;
+        outfitRoot.add(mesh);
     });
-    for (const node of toAttach) {
-        const newBones = node.skeleton.bones.map(b => outfitBones[b.name] || fallback);
-        if (!newBones.length) continue;
-        const newSkel = new THREE.Skeleton(newBones, node.skeleton.boneInverses);
-        node.position.set(0,0,0); node.rotation.set(0,0,0); node.scale.set(1,1,1);
-        node.bind(newSkel, new THREE.Matrix4());
-        (Array.isArray(node.material) ? node.material : [node.material]).forEach(m => {
-            if (m) { m.side = THREE.DoubleSide; m.depthWrite = true; }
-        });
-        node.castShadow = true; node.frustumCulled = false;
-        outfitRoot.add(node);
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -685,7 +697,7 @@ async function loadCharacterFromConfig(cfg) {
         });
 
         // Attacher corps (tete/yeux) AVANT le calcul d'echelle
-        if (bodyGltf)  attachSkinned(bodyGltf,  charRoot, n => HEAD_MESHES.has(n));
+        if (bodyGltf)  attachSkinned(bodyGltf,  charRoot, isHeadRelatedMesh);
         if (hairGltf)  attachSkinned(hairGltf,  charRoot, null);
         if (beardGltf) attachSkinned(beardGltf, charRoot, null);
 
@@ -704,7 +716,9 @@ async function loadCharacterFromConfig(cfg) {
         if (!ualLoaded) {
             await loadAnimations();
         } else {
-            const idle = allClips.find(c => /idle_loop/i.test(c.name))
+            const idle = allClips.find(c => /^idle_loop$/i.test(c.name))
+                      || allClips.find(c => /^idle$/i.test(c.name))
+                      || allClips.find(c => /^idle/i.test(c.name))
                       || allClips.find(c => /idle/i.test(c.name))
                       || allClips[0];
             if (idle) playClip(idle);
