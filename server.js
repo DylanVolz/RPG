@@ -52,12 +52,17 @@ const server = http.createServer((req, res) => {
     //   2. Chemin + .html  (ex: /gameplay-test → gameplay-test.html)
     //   3. Chemin/index.html (dossier)
     function resolvePath(cb) {
-        fs.access(absPath, fs.constants.F_OK, err0 => {
-            if (!err0) { cb(absPath); return; }
-            const withHtml = absPath + '.html';
-            fs.access(withHtml, fs.constants.F_OK, err1 => {
-                if (!err1) { cb(withHtml); return; }
-                cb(path.join(absPath, 'index.html'));
+        fs.stat(absPath, (err0, stat0) => {
+            if (!err0 && stat0.isFile()) { cb(absPath); return; }
+            // Dossier (ex: /) ou inexistant → essayer index.html dans ce dossier
+            const indexHtml = path.join(absPath, 'index.html');
+            fs.stat(indexHtml, (err1, stat1) => {
+                if (!err1 && stat1.isFile()) { cb(indexHtml); return; }
+                // Pas de dossier → essayer en ajoutant .html (ex: /gameplay-test)
+                const withHtml = absPath + '.html';
+                fs.stat(withHtml, (err2, stat2) => {
+                    cb((!err2 && stat2.isFile()) ? withHtml : absPath);
+                });
             });
         });
     }
