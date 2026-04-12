@@ -142,6 +142,17 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
 .clip-item.active { background:rgba(200,184,154,0.14); color:#fff; }
 .clip-item .dur   { font-size:9px; opacity:0.3; }
 
+/* Sous-catégorie header */
+.subcat-header {
+    grid-column: 1 / -1;
+    font-size: 8px; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(200,184,154,0.25);
+    padding: 8px 4px 3px;
+    border-bottom: 1px solid rgba(200,184,154,0.06);
+    margin-bottom: 1px;
+}
+.subcat-header:first-child { padding-top: 3px; }
+
 /* ── Viewport ── */
 #viewport { flex:1; position:relative; background:#111418; }
 #viewport canvas { display:block; width:100% !important; height:100% !important; }
@@ -230,68 +241,128 @@ const UAL_PATHS = [
     'assets/characters/animations/UAL2_Source.glb',
 ];
 
+// CATALOG — structure { catégorie: { sous-catégorie: [items] } }
 const CATALOG = {
-    'Personnages': [
-        { name:'Male Ranger',    src: BASE_OUTFIT+'Male_Ranger.gltf',    animated:true, bodyUrl: BASE_BODY_M },
-        { name:'Male Peasant',   src: BASE_OUTFIT+'Male_Peasant.gltf',   animated:true, bodyUrl: BASE_BODY_M },
-        { name:'Female Ranger',  src: BASE_OUTFIT+'Female_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_F },
-        { name:'Female Peasant', src: BASE_OUTFIT+'Female_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_F },
-    ],
-    'Cheveux': [
-        'Hair_Long','Hair_SimpleParted','Hair_Buzzed','Hair_BuzzedFemale',
-        'Hair_Buns','Hair_Beard',
-        'Eyebrows_Regular','Eyebrows_Female',
-    ].map(n => ({ name:n, src: BASE_HAIR+n+'.gltf' })),
-    'Nature': [
-        'BirchTree_1','BirchTree_2','BirchTree_3','BirchTree_4','BirchTree_5',
-        'MapleTree_1','MapleTree_2','MapleTree_3','MapleTree_4','MapleTree_5',
-        'DeadTree_1','DeadTree_2','DeadTree_3','DeadTree_4','DeadTree_5',
-        'DeadTree_6','DeadTree_7','DeadTree_8','DeadTree_9','DeadTree_10',
-        'Bush','Bush_Flowers','Bush_Large','Bush_Large_Flowers','Bush_Small','Bush_Small_Flowers',
-        'Flower_1','Flower_1_Clump','Flower_2','Flower_2_Clump',
-        'Flower_3_Clump','Flower_4_Clump','Flower_5_Clump',
-        'Grass_Large','Grass_Large_Extruded','Grass_Small',
-    ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
-    'Bâtiments': [
-        'Wall_Plaster_Straight','Wall_Plaster_Straight_Base','Wall_Plaster_Door_Flat',
-        'Wall_Plaster_Door_Round','Wall_Plaster_Window_Wide_Flat','Wall_Plaster_Window_Wide_Round',
-        'Wall_Plaster_Window_Thin_Round','Wall_Plaster_WoodGrid',
-        'Wall_UnevenBrick_Straight','Wall_UnevenBrick_Door_Flat','Wall_UnevenBrick_Door_Round',
-        'Wall_UnevenBrick_Window_Wide_Flat','Wall_UnevenBrick_Window_Wide_Round',
-        'Corner_Exterior_Wood','Corner_Exterior_Brick','Corner_ExteriorWide_Wood','Corner_ExteriorWide_Brick',
-        'Corner_Interior_Big','Corner_Interior_Small',
-        'Floor_Brick','Floor_RedBrick','Floor_WoodDark','Floor_WoodLight',
-        'Roof_RoundTiles_4x4','Roof_RoundTiles_4x6','Roof_RoundTiles_6x6','Roof_RoundTiles_6x8',
-        'Roof_RoundTiles_8x8','Roof_2x4_RoundTile','Roof_Dormer_RoundTile','Roof_Tower_RoundTiles',
-        'Roof_Front_Brick4','Roof_Front_Brick6','Roof_Front_Brick8',
-        'Door_1_Flat','Door_1_Round','Door_2_Flat','Door_2_Round','Door_4_Flat','Door_4_Round',
-        'Window_Thin_Flat1','Window_Thin_Round1','Window_Wide_Flat1','Window_Wide_Round1',
-        'WindowShutters_Wide_Flat_Open','WindowShutters_Wide_Round_Open',
-        'Balcony_Simple_Straight','Balcony_Cross_Straight',
-        'Stair_Interior_Simple','Stair_Interior_Solid',
-        'Stairs_Exterior_Straight','Stairs_Exterior_Platform',
-        'Prop_Chimney','Prop_Chimney2','Prop_Support','Prop_Wagon','Prop_Crate',
-        'Prop_WoodenFence_Single','Prop_MetalFence_Simple',
-        'Prop_Vine1','Prop_Vine2','Prop_Vine4',
-        'Overhang_Plaster_Long','Overhang_Plaster_Short','Overhang_UnevenBrick_Long',
-    ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
-    'Props': [
-        'Anvil','Anvil_Log','Axe_Bronze','Bag','Banner_1','Banner_2',
-        'Barrel','Barrel_Apples','Barrel_Holder',
-        'Bed_Twin1','Bed_Twin2','Bench','Bookcase_2',
-        'Bucket_Metal','Bucket_Wooden_1','Cabinet','Cage_Small',
-        'CandleStick','CandleStick_Stand','CandleStick_Triple','Chandelier',
-        'Chest_Wood','Coin_Pile','Coin_Pile_2','Crate_Wooden','Crate_Metal',
-        'Chair_1','Chalice','Cauldron',
-        'FarmCrate_Apple','FarmCrate_Carrot','FarmCrate_Empty',
-        'Key_Gold','Key_Metal','Lantern_Wall','Mug',
-        'Pickaxe_Bronze','Pot_1','Potion_1','Potion_2','Potion_4',
-        'Pouch_Large','Rope_1','Scroll_1','Scroll_2',
-        'Shield_Wooden','Stall_Empty','Stall_Cart_Empty','Stool',
-        'Sword_Bronze','Table_Large','Torch_Metal',
-        'Vase_2','Vase_4','WeaponStand','Workbench','Workbench_Drawers',
-    ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+    'Personnages': {
+        'Masculin': [
+            { name:'Male Ranger',  src: BASE_OUTFIT+'Male_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Peasant', src: BASE_OUTFIT+'Male_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_M },
+        ],
+        'Féminin': [
+            { name:'Female Ranger',  src: BASE_OUTFIT+'Female_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Peasant', src: BASE_OUTFIT+'Female_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_F },
+        ],
+    },
+    'Cheveux': {
+        'Coiffures': [
+            'Hair_Long','Hair_SimpleParted','Hair_Buzzed','Hair_BuzzedFemale','Hair_Buns','Hair_Beard',
+        ].map(n => ({ name:n, src: BASE_HAIR+n+'.gltf' })),
+        'Sourcils': [
+            'Eyebrows_Regular','Eyebrows_Female',
+        ].map(n => ({ name:n, src: BASE_HAIR+n+'.gltf' })),
+    },
+    'Nature': {
+        'Bouleaux': [
+            'BirchTree_1','BirchTree_2','BirchTree_3','BirchTree_4','BirchTree_5',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+        'Érables': [
+            'MapleTree_1','MapleTree_2','MapleTree_3','MapleTree_4','MapleTree_5',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+        'Arbres Morts': [
+            'DeadTree_1','DeadTree_2','DeadTree_3','DeadTree_4','DeadTree_5',
+            'DeadTree_6','DeadTree_7','DeadTree_8','DeadTree_9','DeadTree_10',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+        'Buissons': [
+            'Bush','Bush_Flowers','Bush_Large','Bush_Large_Flowers','Bush_Small','Bush_Small_Flowers',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+        'Fleurs': [
+            'Flower_1','Flower_1_Clump','Flower_2','Flower_2_Clump',
+            'Flower_3_Clump','Flower_4_Clump','Flower_5_Clump',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+        'Herbe': [
+            'Grass_Large','Grass_Large_Extruded','Grass_Small',
+        ].map(n => ({ name:n, src: BASE_NATURE+n+'.gltf' })),
+    },
+    'Bâtiments': {
+        'Murs Plâtre': [
+            'Wall_Plaster_Straight','Wall_Plaster_Straight_Base','Wall_Plaster_Door_Flat',
+            'Wall_Plaster_Door_Round','Wall_Plaster_Window_Wide_Flat','Wall_Plaster_Window_Wide_Round',
+            'Wall_Plaster_Window_Thin_Round','Wall_Plaster_WoodGrid',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Murs Brique': [
+            'Wall_UnevenBrick_Straight','Wall_UnevenBrick_Door_Flat','Wall_UnevenBrick_Door_Round',
+            'Wall_UnevenBrick_Window_Wide_Flat','Wall_UnevenBrick_Window_Wide_Round',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Coins': [
+            'Corner_Exterior_Wood','Corner_Exterior_Brick','Corner_ExteriorWide_Wood','Corner_ExteriorWide_Brick',
+            'Corner_Interior_Big','Corner_Interior_Small',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Sols': [
+            'Floor_Brick','Floor_RedBrick','Floor_WoodDark','Floor_WoodLight',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Toits': [
+            'Roof_RoundTiles_4x4','Roof_RoundTiles_4x6','Roof_RoundTiles_6x6','Roof_RoundTiles_6x8',
+            'Roof_RoundTiles_8x8','Roof_2x4_RoundTile','Roof_Dormer_RoundTile','Roof_Tower_RoundTiles',
+            'Roof_Front_Brick4','Roof_Front_Brick6','Roof_Front_Brick8',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Portes': [
+            'Door_1_Flat','Door_1_Round','Door_2_Flat','Door_2_Round','Door_4_Flat','Door_4_Round',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Fenêtres': [
+            'Window_Thin_Flat1','Window_Thin_Round1','Window_Wide_Flat1','Window_Wide_Round1',
+            'WindowShutters_Wide_Flat_Open','WindowShutters_Wide_Round_Open',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Balcons & Escaliers': [
+            'Balcony_Simple_Straight','Balcony_Cross_Straight',
+            'Stair_Interior_Simple','Stair_Interior_Solid',
+            'Stairs_Exterior_Straight','Stairs_Exterior_Platform',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+        'Éléments Ext.': [
+            'Prop_Chimney','Prop_Chimney2','Prop_Support','Prop_Wagon','Prop_Crate',
+            'Prop_WoodenFence_Single','Prop_MetalFence_Simple',
+            'Prop_Vine1','Prop_Vine2','Prop_Vine4',
+            'Overhang_Plaster_Long','Overhang_Plaster_Short','Overhang_UnevenBrick_Long',
+        ].map(n => ({ name:n, src: BASE_VILLAGE+n+'.gltf' })),
+    },
+    'Props': {
+        'Armes & Outils': [
+            'Anvil','Anvil_Log','Axe_Bronze','Pickaxe_Bronze','Sword_Bronze',
+            'Shield_Wooden','WeaponStand',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Éclairage': [
+            'CandleStick','CandleStick_Stand','CandleStick_Triple','Chandelier',
+            'Lantern_Wall','Torch_Metal',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Mobilier': [
+            'Bench','Bed_Twin1','Bed_Twin2','Bookcase_2','Cabinet',
+            'Chair_1','Stool','Table_Large','Workbench','Workbench_Drawers',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Conteneurs': [
+            'Bag','Barrel','Barrel_Apples','Barrel_Holder',
+            'Bucket_Metal','Bucket_Wooden_1','Chest_Wood',
+            'Crate_Wooden','Crate_Metal','Pouch_Large',
+            'FarmCrate_Apple','FarmCrate_Carrot','FarmCrate_Empty',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Nourriture & Potions': [
+            'Cauldron','Chalice','Mug','Pot_1',
+            'Potion_1','Potion_2','Potion_4',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Commerce': [
+            'Stall_Empty','Stall_Cart_Empty',
+            'Coin_Pile','Coin_Pile_2','Key_Gold','Key_Metal',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+        'Décoration': [
+            'Banner_1','Banner_2','Cage_Small',
+            'Rope_1','Scroll_1','Scroll_2','Vase_2','Vase_4',
+        ].map(n => ({ name:n, src: BASE_PROPS+n+'.gltf' })),
+    },
 };
+
+// Aplatir une catégorie pour la recherche et le comptage
+function flattenCat(cat) {
+    const subs = CATALOG[cat];
+    return Object.values(subs).flat();
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  SCÈNE PRINCIPALE
@@ -352,23 +423,24 @@ grid.position.y = 0.001; scene.add(grid);
 // ═══════════════════════════════════════════════════════════════
 //  RENDERER OFFSCREEN — génération des thumbnails
 // ═══════════════════════════════════════════════════════════════
-const THUMB_SIZE = 128;
-const thumbR = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+const THUMB_SIZE = 160;
+const thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 thumbR.setSize(THUMB_SIZE, THUMB_SIZE);
 thumbR.setPixelRatio(1);
 thumbR.outputColorSpace = THREE.SRGBColorSpace;
 
 const thumbScene = new THREE.Scene();
-thumbScene.background = new THREE.Color(0x0d1014);
-const thumbCam = new THREE.PerspectiveCamera(42, 1, 0.01, 300);
+thumbScene.background = new THREE.Color(0x161c24);
+const thumbCam = new THREE.PerspectiveCamera(38, 1, 0.001, 2000);
 
-thumbScene.add(new THREE.AmbientLight(0xffd8a0, 0.9));
-const tSun = new THREE.DirectionalLight(0xffffff, 2.8);
-tSun.position.set(3, 5, 3); thumbScene.add(tSun);
-const tFill = new THREE.DirectionalLight(0x8090c0, 0.6);
-tFill.position.set(-3, 2, -2); thumbScene.add(tFill);
-const tRim = new THREE.DirectionalLight(0xffaa44, 0.8);
-tRim.position.set(0, 3, -5); thumbScene.add(tRim);
+// Éclairage thumbnail : lumineux, 3 points bien définis
+thumbScene.add(new THREE.AmbientLight(0xfff0e0, 1.8));
+const tKey = new THREE.DirectionalLight(0xfff5e0, 3.5);
+tKey.position.set(3, 6, 4); thumbScene.add(tKey);
+const tFill = new THREE.DirectionalLight(0x90aacc, 1.2);
+tFill.position.set(-4, 2, -1); thumbScene.add(tFill);
+const tRim = new THREE.DirectionalLight(0xffcc88, 1.6);
+tRim.position.set(1, 3, -5); thumbScene.add(tRim);
 
 const gltfLoader = new GLTFLoader();
 const _gltfCache = {};
@@ -405,28 +477,36 @@ async function renderThumb(item) {
         mats.forEach(m => { if (m) { m.side = THREE.DoubleSide; m.clippingPlanes = []; } });
     });
 
-    // Normaliser la taille à 2 unités
-    const box0 = new THREE.Box3().setFromObject(root);
-    const size0 = box0.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size0.x, size0.y, size0.z) || 1;
-    root.scale.setScalar(2 / maxDim);
-
-    // Centrer
-    const box1 = new THREE.Box3().setFromObject(root);
-    const center = box1.getCenter(new THREE.Vector3());
-    root.position.sub(center);
-
+    // 1. Ajouter à la scène avant de calculer la bbox (certains objets en ont besoin)
     thumbScene.add(root);
     _thumbRoot = root;
 
-    // Caméra légèrement au-dessus et de face
-    const dist = 3.2;
-    thumbCam.position.set(dist * 0.5, dist * 0.35, dist);
-    thumbCam.lookAt(0, 0, 0);
+    // 2. Centrer sur la bbox réelle
+    const box = new THREE.Box3().setFromObject(root);
+    const center = box.getCenter(new THREE.Vector3());
+    root.position.sub(center);
+
+    // 3. Rotation 3/4 pour un meilleur angle de présentation
+    root.rotation.y = Math.PI / 6;  // 30° autour de Y
+
+    // 4. Bounding sphere APRÈS centrage → distance caméra dynamique
+    const sphere = new THREE.Sphere();
+    new THREE.Box3().setFromObject(root).getBoundingSphere(sphere);
+    const radius = Math.max(sphere.radius, 0.01);
+
+    // dist = radius / tan(halfFov)  avec 20% de marge
+    const halfFovRad = (thumbCam.fov / 2) * Math.PI / 180;
+    const dist = (radius / Math.tan(halfFovRad)) * 1.22;
+
+    // Angle 3/4 : légèrement sur le côté et au-dessus
+    thumbCam.position.set(dist * 0.45, dist * 0.38, dist * 0.88);
+    thumbCam.lookAt(sphere.center);
+    thumbCam.near = dist * 0.005;
+    thumbCam.far  = dist * 20;
     thumbCam.updateProjectionMatrix();
 
     thumbR.render(thumbScene, thumbCam);
-    return thumbR.domElement.toDataURL('image/jpeg', 0.85);
+    return thumbR.domElement.toDataURL('image/jpeg', 0.88);
 }
 
 // Queue séquentielle avec IntersectionObserver
@@ -631,42 +711,56 @@ function playClip(clip) {
 let currentCat = 'Personnages';
 let searchTerm = '';
 
+function _appendCard(el, item) {
+    const card = document.createElement('div');
+    card.className = 'thumb-card loading';
+    card._item = item;
+
+    const img = document.createElement('img');
+    img.className = 'thumb-img';
+    img.alt = item.name;
+
+    const label = document.createElement('div');
+    label.className = 'thumb-name';
+    label.textContent = item.name;
+
+    card.appendChild(img);
+    card.appendChild(label);
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        loadModel(item);
+    });
+    el.appendChild(card);
+    _thumbObserver.observe(card);
+}
+
 function renderGrid() {
-    const items    = CATALOG[currentCat] || [];
+    const subs    = CATALOG[currentCat] || {};
+    const allItems = flattenCat(currentCat);
     const term     = searchTerm.toLowerCase();
-    const filtered = items.filter(i => !term || i.name.toLowerCase().includes(term));
+    const el       = document.getElementById('model-grid');
+    el.innerHTML   = '';
 
-    const el = document.getElementById('model-grid');
-    el.innerHTML = '';
-
-    for (const item of filtered) {
-        const card = document.createElement('div');
-        card.className = 'thumb-card loading';
-        card._item = item;
-
-        const img = document.createElement('img');
-        img.className = 'thumb-img';
-        img.alt = item.name;
-
-        const label = document.createElement('div');
-        label.className = 'thumb-name';
-        label.textContent = item.name;
-
-        card.appendChild(img);
-        card.appendChild(label);
-        card.addEventListener('click', () => {
-            document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
-            card.classList.add('active');
-            loadModel(item);
-        });
-        el.appendChild(card);
-
-        // Thumbnail générée dès que la card est visible
-        _thumbObserver.observe(card);
+    if (term) {
+        // Mode recherche — liste plate sans headers
+        const filtered = allItems.filter(i => i.name.toLowerCase().includes(term));
+        for (const item of filtered) _appendCard(el, item);
+        document.getElementById('model-count').textContent =
+            filtered.length + ' / ' + allItems.length + ' assets';
+    } else {
+        // Mode normal — headers par sous-catégorie
+        for (const [subName, items] of Object.entries(subs)) {
+            if (!items.length) continue;
+            const hdr = document.createElement('div');
+            hdr.className = 'subcat-header';
+            hdr.textContent = subName;
+            el.appendChild(hdr);
+            for (const item of items) _appendCard(el, item);
+        }
+        document.getElementById('model-count').textContent =
+            allItems.length + ' assets';
     }
-
-    document.getElementById('model-count').textContent =
-        filtered.length + ' / ' + items.length + ' assets';
 }
 
 // Tabs
