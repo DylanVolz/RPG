@@ -321,6 +321,12 @@ canvas { display:block; width:100vw; height:100vh; }
       <div class="wg-row"><span class="wg-lbl">Rot Y</span><input type="range" id="wg-ry" min="-3.15" max="3.15" step="0.05"><span class="wg-val" id="wg-ry-v">0</span></div>
       <div class="wg-row"><span class="wg-lbl">Rot Z</span><input type="range" id="wg-rz" min="-3.15" max="3.15" step="0.05"><span class="wg-val" id="wg-rz-v">0</span></div>
       <div class="wg-row"><span class="wg-lbl">Scale</span><input type="range" id="wg-sc" min="0.3" max="3.0" step="0.05"><span class="wg-val" id="wg-sc-v">1</span></div>
+      <div style="border-top:1px solid rgba(200,184,154,0.08);margin:4px 0 3px;font-size:7px;letter-spacing:1.5px;color:rgba(200,184,154,0.25);">― PIVOT (rotation au centre) ―</div>
+      <div class="wg-row"><span class="wg-lbl">Roll X</span><input type="range" id="wg-rlx" min="-3.15" max="3.15" step="0.02"><span class="wg-val" id="wg-rlx-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Roll Y</span><input type="range" id="wg-ty"  min="-3.15" max="3.15" step="0.02"><span class="wg-val" id="wg-ty-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Roll Z</span><input type="range" id="wg-rlz" min="-3.15" max="3.15" step="0.02"><span class="wg-val" id="wg-rlz-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Piv X</span><input type="range" id="wg-pvx" min="-0.4" max="0.4" step="0.005"><span class="wg-val" id="wg-pvx-v">0</span></div>
+      <div class="wg-row"><span class="wg-lbl">Piv Z</span><input type="range" id="wg-pvz" min="-0.4" max="0.4" step="0.005"><span class="wg-val" id="wg-pvz-v">0</span></div>
     </div>
   </div>
 </div>
@@ -1265,6 +1271,9 @@ function applyIsolatedScales(root, overrides, restPos) {
 // ═══════════════════════════════════════════════════════════════
 let charRoot   = null;
 let mixer      = null;
+let _rootMotionBone    = null;  // bone topmost du squelette (détecté une seule fois)
+let _prevAttackAction  = null;  // action d'attaque en train de fade-out (crossfade)
+let _prevBoneX = 0, _prevBoneZ = 0; // position bone frame précédent (delta root motion)
 let inventory  = null;
 const actions  = {};       // nom clip → AnimationAction
 let activeAct  = null;
@@ -1495,7 +1504,7 @@ const WEAPON_DEFS = {
     sword:   { label:'Épée',    path:'assets/environment/props/Sword_Bronze.gltf',   hand:'R', len:0.75, pos:[0,0.06,0.01], rot:[Math.PI/2,0,0], combat:1 },
     axe:     { label:'Hache',   path:'assets/environment/props/Axe_Bronze.gltf',     hand:'R', len:0.55, pos:[0,0.05,0   ], rot:[Math.PI/2,0,0], combat:5 },
     knife:   { label:'Couteau', path:'assets/environment/props/Table_Knife.gltf',    hand:'R', len:0.22, pos:[0,0.03,0   ], rot:[Math.PI/2,0,0], combat:6 },
-    torch:   { label:'Torche',  path:'assets/environment/props/Torch_Metal.gltf',    hand:'R', len:0.40, pos:[0,0.04,0   ], rot:[Math.PI/2,0,0], combat:8 },
+    torch:   { label:'Torche',  path:'assets/environment/props/CandleStick.gltf',    hand:'L', len:0.35, pos:[0,0.04,0   ], rot:[Math.PI/2,0,0], combat:8 },
     pickaxe: { label:'Pioche',  path:'assets/environment/props/Pickaxe_Bronze.gltf', hand:'R', len:0.60, pos:[0,0.06,0.01], rot:[Math.PI/2,0,0], combat:7 },
     shield:  { label:'Bouclier',path:'assets/environment/props/Shield_Wooden.gltf',  hand:'L', len:0.45, pos:[0,0,0.03   ], rot:[0,0,Math.PI/2], combat:-1 },
 };
@@ -1511,12 +1520,13 @@ const WEAPON_DEFS = {
 
 // Slots : quelles armes peuvent aller dans chaque main
 const SLOT_WEAPONS = {
-    R: ['sword','axe','knife','torch','pickaxe'],
-    L: ['shield','sword','axe'],
+    R: ['sword','axe','knife','pickaxe'],
+    L: ['shield','torch','sword','axe'],
 };
 
 let equippedR    = null;   // mesh main droite
 let equippedL    = null;   // mesh main gauche
+let backSwordMesh = null;  // mesh épée holstérée dans le dos (spine_02)
 let activeKeyR   = 'none';
 let activeKeyL   = 'none';
 let gripEditSlot = null;   // slot en cours d'édition dans le panel grip
@@ -1530,8 +1540,148 @@ function _findBone(name) {
 
 function _clearSlot(slot) {
     const bone = _findBone(slot === 'R' ? 'hand_r' : 'hand_l');
-    if (slot === 'R' && equippedR) { if (bone) bone.remove(equippedR); equippedR = null; activeKeyR = 'none'; }
-    if (slot === 'L' && equippedL) { if (bone) bone.remove(equippedL); equippedL = null; activeKeyL = 'none'; }
+    if (slot === 'R' && equippedR) {
+        if (bone) bone.remove(equippedR.userData._pivot || equippedR);
+        equippedR = null; activeKeyR = 'none';
+    }
+    if (slot === 'L' && equippedL) {
+        if (bone) bone.remove(equippedL.userData._pivot || equippedL);
+        equippedL = null; activeKeyL = 'none';
+    }
+}
+
+// ── Holster dos ─────────────────────────────────────────────────────────
+// Position de l'épée sur le dos (spine_02 local space).
+// Ajuste ces valeurs si la position ne semble pas bonne.
+const BACK_HOLSTER = {
+    sword: { pos:[ 0.02, 0.10, -0.07], rot:[1.55, 0.20, 0.78] },
+    //        pos: légèrement à droite, plus haut, plaqué contre le dos
+    //        rot: X≈89° (à plat sur le dos), Y≈11°, Z≈45° (diagonale manche-haut-droite)
+};
+
+// Attache un mesh déjà chargé (gltf) à un bone sans ouvrir le grip editor
+function _attachWeaponMesh(slot, key, gltf) {
+    const def  = WEAPON_DEFS[key];
+    const bone = _findBone(slot === 'R' ? 'hand_r' : 'hand_l');
+    if (!bone || !def || !gltf || !charRoot) return null;
+
+    const mesh = gltf.scene.clone(true);
+    mesh.traverse(n => { n.castShadow = true; });
+
+    const box     = new THREE.Box3().setFromObject(mesh);
+    const meshLen = box.getSize(new THREE.Vector3()).length();
+    const sc      = (def.len / charRoot.scale.x) / meshLen;
+
+    const g = _gripFor(key);
+    const pivotGroup = new THREE.Group();
+    pivotGroup.position.set(g.px, g.py, g.pz);
+    pivotGroup.rotation.set(g.rollX || 0, g.ty || 0, g.rollZ || 0);
+    mesh.position.set(-(g.pivX || 0), 0, -(g.pivZ || 0));
+    mesh.rotation.set(g.rx, g.ry, g.rz);
+    mesh.scale.setScalar(sc);
+
+    pivotGroup.add(mesh);
+    bone.add(pivotGroup);
+    mesh.userData._pivot     = pivotGroup;
+    mesh.userData._baseScale = sc;
+
+    if (slot === 'R') { equippedR = mesh; activeKeyR = key; }
+    else              { equippedL = mesh; activeKeyL = key; }
+    return mesh;
+}
+
+// Retire le mesh du dos
+function _removeFromBack() {
+    if (!backSwordMesh) return;
+    const spineBone = _findBone('spine_02');
+    if (spineBone) spineBone.remove(backSwordMesh.userData._pivot || backSwordMesh);
+    backSwordMesh = null;
+}
+
+// Place une arme sur le dos (holster visuel)
+async function _attachToBack(key) {
+    const def       = WEAPON_DEFS[key];
+    const spineBone = _findBone('spine_02');
+    const holster   = BACK_HOLSTER[key];
+    if (!def || !spineBone || !holster || !charRoot) return;
+
+    let gltf;
+    try { gltf = await loadGLTF(def.path); }
+    catch(e) { return; }
+
+    const mesh = gltf.scene.clone(true);
+    mesh.traverse(n => { n.castShadow = true; });
+
+    const box     = new THREE.Box3().setFromObject(mesh);
+    const meshLen = box.getSize(new THREE.Vector3()).length();
+    const sc      = (def.len / charRoot.scale.x) / meshLen;
+    mesh.scale.setScalar(sc);
+    mesh.position.set(...holster.pos);
+    mesh.rotation.set(...holster.rot);
+
+    spineBone.add(mesh);
+    backSwordMesh = mesh;
+}
+
+// Dégaine l'épée depuis le dos (Digit1)
+async function drawSword() {
+    if (STATE.oneShotLock) return;
+
+    // Déjà en stance épée → rengainer
+    if (STATE.combatMode === 1 && STATE.inCombatStance) {
+        _sheathSword();
+        return;
+    }
+
+    // Pré-charger le GLTF (mis en cache par loadGLTF)
+    let gltf;
+    try { gltf = await loadGLTF(WEAPON_DEFS.sword.path); }
+    catch(e) { console.error('[Sword] Chargement échoué', e); return; }
+
+    // Retirer du dos si présent
+    _removeFromBack();
+
+    // Entrer en stance immédiatement (pour que updateCombat soit actif)
+    STATE.combatMode    = 1;
+    STATE.inCombatStance = true;
+    comboStep = 0; comboTimer = 0; attackCooldown = 0;
+    document.getElementById('dbg-combat').textContent  = 'Épée';
+    document.getElementById('combat-mode').textContent = '⚔ Épée';
+
+    // Jouer sword_enter, puis attacher l'épée à la fin de l'anim
+    playAnim('sword_enter', 0.1, () => {
+        STATE.oneShotLock = false;
+        if (!equippedR || activeKeyR !== 'sword') {
+            _attachWeaponMesh('R', 'sword', gltf);
+        }
+        _applyWeaponCombatMode();
+        _refreshWeaponUI();
+        playAnim('sword_idle', 0.2);
+    });
+    STATE.oneShotLock = true;
+    showNotif('⚔ Épée');
+}
+
+// Rengaine l'épée (joue sword_exit puis met au dos)
+function _sheathSword() {
+    if (STATE.oneShotLock) return;
+    STATE.inCombatStance = false;
+    STATE.blocking        = false;
+    attackBuffer          = false;
+
+    playAnim('sword_exit', 0.1, () => {
+        STATE.oneShotLock = false;
+        _clearSlot('R');
+        _applyWeaponCombatMode();
+        _refreshWeaponUI();
+        _hideGripEditor();
+        STATE.combatMode = 0;
+        document.getElementById('dbg-combat').textContent  = '';
+        document.getElementById('combat-mode').textContent = '—';
+        playAnim('idle', 0.25);
+        _attachToBack('sword'); // async, fire-and-forget
+    });
+    STATE.oneShotLock = true;
 }
 
 async function equipWeapon(slot, key) {
@@ -1568,10 +1718,24 @@ async function equipWeapon(slot, key) {
     const meshLen = box.getSize(new THREE.Vector3()).length();
     const sc      = (def.len / charRoot.scale.x) / meshLen;
     mesh.scale.setScalar(sc);
-    mesh.position.set(...def.pos);
-    mesh.rotation.set(...def.rot);
 
-    bone.add(mesh);
+    // Charger grip sauvegardé (ou défauts)
+    const g = _gripFor(key);
+
+    // Groupe pivot — positionné au grip, rotations autour du centre
+    const pivotGroup = new THREE.Group();
+    pivotGroup.position.set(g.px, g.py, g.pz);
+    pivotGroup.rotation.set(g.rollX, g.ty, g.rollZ);
+
+    // Le mesh est offset dans le pivot pour que le point de tilt soit au centre
+    mesh.position.set(-g.pivX, 0, -g.pivZ);
+    mesh.rotation.set(g.rx, g.ry, g.rz);
+
+    pivotGroup.add(mesh);
+    bone.add(pivotGroup);
+    mesh.userData._pivot     = pivotGroup;
+    mesh.userData._baseScale = sc;
+
     if (slot === 'R') { equippedR = mesh; activeKeyR = key; }
     else              { equippedL = mesh; activeKeyL = key; }
 
@@ -1607,23 +1771,24 @@ function _applyWeaponCombatMode() {
 
 // ── Grip editor (sliders temps réel) ─────────────────────────────
 // ── Persistance des grips dans localStorage ───────────────────
-const GRIP_STORAGE_KEY = 'darkrpg_weapon_grips_v1';
+const GRIP_STORAGE_KEY = 'darkrpg_weapon_grips_v2';
 
 function _loadGrips() {
     try { return JSON.parse(localStorage.getItem(GRIP_STORAGE_KEY) || '{}'); } catch { return {}; }
 }
-function _saveGrip(key, px, py, pz, rx, ry, rz, sc) {
+function _saveGrip(key, px, py, pz, rx, ry, rz, sc, ty=0, pivX=0, pivZ=0, rollX=0, rollZ=0) {
     const grips = _loadGrips();
-    grips[key] = { px, py, pz, rx, ry, rz, sc };
+    grips[key] = { px, py, pz, rx, ry, rz, sc, ty, pivX, pivZ, rollX, rollZ };
     localStorage.setItem(GRIP_STORAGE_KEY, JSON.stringify(grips));
 }
 function _gripFor(key) {
     // Retourne les offsets sauvegardés, ou les défauts de WEAPON_DEFS
     const saved = _loadGrips()[key];
-    if (saved) return saved;
+    if (saved) return { ty:0, pivX:0, pivZ:0, rollX:0, rollZ:0, ...saved };
     const def = WEAPON_DEFS[key];
     return { px: def.pos[0], py: def.pos[1], pz: def.pos[2],
-             rx: def.rot[0], ry: def.rot[1], rz: def.rot[2], sc: 1.0 };
+             rx: def.rot[0], ry: def.rot[1], rz: def.rot[2], sc: 1.0,
+             ty: 0, pivX: 0, pivZ: 0, rollX: 0, rollZ: 0 };
 }
 
 function _showGripEditor(slot, key, mesh) {
@@ -1645,36 +1810,57 @@ function _showGripEditor(slot, key, mesh) {
     setSlider('wg-px', g.px); setSlider('wg-py', g.py); setSlider('wg-pz', g.pz);
     setSlider('wg-rx', g.rx); setSlider('wg-ry', g.ry); setSlider('wg-rz', g.rz);
     setSlider('wg-sc', g.sc);
+    setSlider('wg-ty',  g.ty);
+    setSlider('wg-rlx', g.rollX);
+    setSlider('wg-rlz', g.rollZ);
+    setSlider('wg-pvx', g.pivX);
+    setSlider('wg-pvz', g.pivZ);
 
     // Appliquer immédiatement les offsets chargés
-    mesh.position.set(g.px, g.py, g.pz);
+    const pivot = mesh.userData._pivot;
+    if (pivot) { pivot.position.set(g.px, g.py, g.pz); pivot.rotation.set(g.rollX, g.ty, g.rollZ); }
+    mesh.position.set(-g.pivX, 0, -g.pivZ);
     mesh.rotation.set(g.rx, g.ry, g.rz);
     mesh.scale.setScalar(mesh.userData._baseScale * g.sc);
 
     const update = () => {
-        const px = +document.getElementById('wg-px').value;
-        const py = +document.getElementById('wg-py').value;
-        const pz = +document.getElementById('wg-pz').value;
-        const rx = +document.getElementById('wg-rx').value;
-        const ry = +document.getElementById('wg-ry').value;
-        const rz = +document.getElementById('wg-rz').value;
-        const sc = +document.getElementById('wg-sc').value;
-        document.getElementById('wg-px-v').textContent = px.toFixed(3);
-        document.getElementById('wg-py-v').textContent = py.toFixed(3);
-        document.getElementById('wg-pz-v').textContent = pz.toFixed(3);
-        document.getElementById('wg-rx-v').textContent = rx.toFixed(3);
-        document.getElementById('wg-ry-v').textContent = ry.toFixed(3);
-        document.getElementById('wg-rz-v').textContent = rz.toFixed(3);
-        document.getElementById('wg-sc-v').textContent = sc.toFixed(2);
-        mesh.position.set(px, py, pz);
+        const px   = +document.getElementById('wg-px').value;
+        const py   = +document.getElementById('wg-py').value;
+        const pz   = +document.getElementById('wg-pz').value;
+        const rx   = +document.getElementById('wg-rx').value;
+        const ry   = +document.getElementById('wg-ry').value;
+        const rz   = +document.getElementById('wg-rz').value;
+        const sc   = +document.getElementById('wg-sc').value;
+        const ty   = +document.getElementById('wg-ty').value;
+        const rollX= +document.getElementById('wg-rlx').value;
+        const rollZ= +document.getElementById('wg-rlz').value;
+        const pivX = +document.getElementById('wg-pvx').value;
+        const pivZ = +document.getElementById('wg-pvz').value;
+        document.getElementById('wg-px-v').textContent  = px.toFixed(3);
+        document.getElementById('wg-py-v').textContent  = py.toFixed(3);
+        document.getElementById('wg-pz-v').textContent  = pz.toFixed(3);
+        document.getElementById('wg-rx-v').textContent  = rx.toFixed(3);
+        document.getElementById('wg-ry-v').textContent  = ry.toFixed(3);
+        document.getElementById('wg-rz-v').textContent  = rz.toFixed(3);
+        document.getElementById('wg-sc-v').textContent  = sc.toFixed(2);
+        document.getElementById('wg-ty-v').textContent  = ty.toFixed(3);
+        document.getElementById('wg-rlx-v').textContent = rollX.toFixed(3);
+        document.getElementById('wg-rlz-v').textContent = rollZ.toFixed(3);
+        document.getElementById('wg-pvx-v').textContent = pivX.toFixed(3);
+        document.getElementById('wg-pvz-v').textContent = pivZ.toFixed(3);
+        // Pivot (groupe) = grip position + rotations au centre
+        const pivot = mesh.userData._pivot;
+        if (pivot) { pivot.position.set(px, py, pz); pivot.rotation.set(rollX, ty, rollZ); }
+        // Mesh dans le pivot = offset de centrage + orientation fine
+        mesh.position.set(-pivX, 0, -pivZ);
         mesh.rotation.set(rx, ry, rz);
         mesh.scale.setScalar(mesh.userData._baseScale * sc);
         // Auto-sauvegarde à chaque changement
-        _saveGrip(key, px, py, pz, rx, ry, rz, sc);
+        _saveGrip(key, px, py, pz, rx, ry, rz, sc, ty, pivX, pivZ, rollX, rollZ);
     };
 
     // Nettoyer les anciens listeners (re-attachement à chaque équipement)
-    const sliderIds = ['wg-px','wg-py','wg-pz','wg-rx','wg-ry','wg-rz','wg-sc'];
+    const sliderIds = ['wg-px','wg-py','wg-pz','wg-rx','wg-ry','wg-rz','wg-sc','wg-ty','wg-rlx','wg-rlz','wg-pvx','wg-pvz'];
     sliderIds.forEach(id => {
         const el = document.getElementById(id);
         const fresh = el.cloneNode(true);
@@ -1685,6 +1871,11 @@ function _showGripEditor(slot, key, mesh) {
     setSlider('wg-px', g.px); setSlider('wg-py', g.py); setSlider('wg-pz', g.pz);
     setSlider('wg-rx', g.rx); setSlider('wg-ry', g.ry); setSlider('wg-rz', g.rz);
     setSlider('wg-sc', g.sc);
+    setSlider('wg-ty',  g.ty);
+    setSlider('wg-rlx', g.rollX);
+    setSlider('wg-rlz', g.rollZ);
+    setSlider('wg-pvx', g.pivX);
+    setSlider('wg-pvz', g.pivZ);
 }
 
 function _hideGripEditor() {
@@ -1694,14 +1885,20 @@ function _hideGripEditor() {
 }
 
 function logGripOffsets() {
-    const key = gripEditSlot === 'R' ? activeKeyR : activeKeyL;
-    const mesh = gripEditSlot === 'R' ? equippedR : equippedL;
+    const key  = gripEditSlot === 'R' ? activeKeyR : activeKeyL;
+    const mesh = gripEditSlot === 'R' ? equippedR   : equippedL;
     if (!mesh) return;
-    const p = mesh.position, r = mesh.rotation;
-    const sc = mesh.scale.x / (mesh.userData._baseScale || mesh.scale.x);
-    // Sauvegarde réelle dans localStorage
-    _saveGrip(key, p.x, p.y, p.z, r.x, r.y, r.z, sc);
-    console.log('[Grip]', `${key}: pos:[${p.x.toFixed(4)},${p.y.toFixed(4)},${p.z.toFixed(4)}] rot:[${r.x.toFixed(4)},${r.y.toFixed(4)},${r.z.toFixed(4)}] sc:${sc.toFixed(3)}`);
+    const pivot = mesh.userData._pivot;
+    const p     = pivot ? pivot.position : mesh.position;
+    const rollX = pivot ? pivot.rotation.x : 0;
+    const ty    = pivot ? pivot.rotation.y : 0;
+    const rollZ = pivot ? pivot.rotation.z : 0;
+    const r     = mesh.rotation;
+    const pivX  = -(mesh.position.x);
+    const pivZ  = -(mesh.position.z);
+    const sc    = mesh.scale.x / (mesh.userData._baseScale || mesh.scale.x);
+    _saveGrip(key, p.x, p.y, p.z, r.x, r.y, r.z, sc, ty, pivX, pivZ, rollX, rollZ);
+    console.log('[Grip]', `${key}: pos:[${p.x.toFixed(4)},${p.y.toFixed(4)},${p.z.toFixed(4)}] rot:[${r.x.toFixed(4)},${r.y.toFixed(4)},${r.z.toFixed(4)}] sc:${sc.toFixed(3)} pivot.rot:[${rollX.toFixed(4)},${ty.toFixed(4)},${rollZ.toFixed(4)}] piv:[${pivX.toFixed(4)},${pivZ.toFixed(4)}]`);
     showNotif('✓ Grip sauvegardé — ' + key);
 }
 
@@ -2256,11 +2453,14 @@ function _updateInner(delta) {
     else if (!gHeld && emoteWheelOpen) closeEmoteWheel();
 
     // Mode combat
-    if (consumeKey('Digit1')) setCombatMode(1);
+    if (consumeKey('Digit1')) drawSword();
     if (consumeKey('Digit2')) setCombatMode(2);
     if (consumeKey('Digit3')) setCombatMode(3);
     if (consumeKey('Digit4')) setCombatMode(4);
-    if (consumeKey('Digit0')) setCombatMode(0);
+    if (consumeKey('Digit0')) {
+        if (STATE.combatMode === 1) _sheathSword();
+        else setCombatMode(0);
+    }
 
     // Kick
     if (consumeKey('KeyK')) doKick();
@@ -2329,11 +2529,13 @@ function _updateInner(delta) {
         );
         if (isMoving && STATE.traversal !== 'slide' && !landingLocked) {
             // En attaque : vitesse réduite (footwork) sans changer d'orientation
-            const atkMult = STATE.attackLock ? 0.25 : 1.0;
-            const spd = getMoveSpeed(isSprinting) * atkMult;
+            // En block  : vitesse réduite (30%), pas de sprint, pivotement limité
+            const atkMult   = STATE.attackLock ? 0.25 : 1.0;
+            const blockMult = STATE.blocking   ? 0.30 : 1.0;
+            const spd = getMoveSpeed(false) * atkMult * blockMult;
             STATE.pos.x += _moveDir.x * spd * delta;
             STATE.pos.z += _moveDir.z * spd * delta;
-            if (!STATE.attackLock) {
+            if (!STATE.attackLock && !STATE.blocking) {
                 STATE.yawTarget = Math.atan2(_moveDir.x, _moveDir.z);
                 if (isSprinting) STATE.stamina = Math.max(0, STATE.stamina - 15 * delta);
             }
@@ -2483,6 +2685,12 @@ function _updateInner(delta) {
         showNotif(STATE.walkToggle ? 'Marche' : 'Course');
     }
 
+    // Sprint / saut annule le block
+    if (STATE.blocking && (isSprinting || spaceJust)) {
+        STATE.blocking = false;
+        playAnim(getCombatIdleAnim(), 0.15);
+    }
+
     // ── ACTIONS : Saut / Vault / Grimpe ───────────────────────
     if (spaceJust && STATE.grounded && !STATE.oneShotLock) {
         if (STATE.posture === 'stand') {
@@ -2516,7 +2724,7 @@ function _updateInner(delta) {
 
     // ── COUCHE 4 — COMBAT ──────────────────────────────────────
     if (kickCooldown > 0) kickCooldown -= delta;
-    if (STATE.inCombatStance) updateCombat(delta, mouseLJust, mouseRJust);
+    if (STATE.inCombatStance) updateCombat(delta, mouseLJust, mouseRJust, mouseR);
 
     // ── Sprint state machine ────────────────────────────────────
     // sprintState : 'off' | 'enter' | 'on' | 'exit'
@@ -3040,6 +3248,7 @@ function enterCombatStance() {
 function exitCombatStance() {
     if (!STATE.inCombatStance) return;
     STATE.inCombatStance = false;
+    STATE.blocking  = false;
     toolLoopActive  = false;
     attackBuffer    = false;
     const exitAnim = STATE.combatMode === 1 ? 'sword_exit'
@@ -3093,7 +3302,7 @@ function doKick() {
     });
 }
 
-function updateCombat(delta, atkJust, blockJust) {
+function updateCombat(delta, atkJust, blockJust, blockHeld) {
     attackCooldown -= delta;
     comboTimer     -= delta;
     if (comboTimer < 0) {
@@ -3101,13 +3310,26 @@ function updateCombat(delta, atkJust, blockJust) {
         attackBuffer = false; // reset buffer avec le combo
     }
 
-    // Blocage / viser
-    if (blockJust && !STATE.oneShotLock) {
-        if (STATE.combatMode === 1 || STATE.hasShield ||
-            STATE.combatMode === 5 || STATE.combatMode === 6) {
-            playAnim('sword_block', 0.1);
+    // ── Block hold (mouseR tenu) ────────────────────────────────
+    const canBlock = STATE.combatMode === 1 || STATE.hasShield ||
+                     STATE.combatMode === 5 || STATE.combatMode === 6;
+
+    if (canBlock) {
+        if (blockHeld && !STATE.blocking && !STATE.oneShotLock) {
+            // Entrer en garde — sword_block est un LOOP, tenu tant que mouseR est pressé
+            playAnim('sword_block', 0.12);
             STATE.blocking = true;
-        } else if (STATE.combatMode === 3) {
+        } else if (!blockHeld && STATE.blocking) {
+            // Relâcher : retour à la stance de combat
+            STATE.blocking = false;
+            playAnim(getCombatIdleAnim(), 0.2);
+        }
+        if (STATE.blocking) return; // aucune attaque pendant le block
+    }
+
+    // Viser (magie / arc) — déclenché sur press
+    if (blockJust && !STATE.oneShotLock) {
+        if (STATE.combatMode === 3) {
             playAnim('spell2_idle', 0.15);
         } else if (STATE.combatMode === 4) {
             const aim = activeClip === 'bow_idle'  ? 'bow_aim_u'
@@ -3184,7 +3406,7 @@ function updateCombat(delta, atkJust, blockJust) {
 
     // Lunge — impulsion avant selon le mode
     {
-        const lungeStr = STATE.combatMode === 1 ? 3.5
+        const lungeStr = STATE.combatMode === 1 ? 2.0
                        : STATE.combatMode === 2 ? 2.2
                        : STATE.combatMode === 5 ? 2.8
                        : STATE.combatMode === 6 ? 2.0
@@ -3200,8 +3422,9 @@ function updateCombat(delta, atkJust, blockJust) {
     playAnim(atkAnim, 0.06, () => {
         STATE.attackLock  = false;
         STATE.oneShotLock = false;
-        // Si un clic a été bufferisé pendant cette attaque, ne pas revenir à idle —
-        // updateCombat va enchaîner directement au prochain frame
+        // Capturer l'action avant qu'elle soit remplacée — pour continuer
+        // à zeroing le root bone pendant le crossfade (getEffectiveWeight)
+        _prevAttackAction = activeAct;
         if (!attackBuffer) playAnim(_returnTo, 0.2);
     });
     STATE.oneShotLock = true;
@@ -3224,6 +3447,48 @@ function updateCharMesh(delta) {
 
     // 3. Animer + bone scaling
     mixer.update(delta);
+
+    // ── Root motion extraction ─────────────────────────────────────────────
+    // Pendant attackLock : le mixer pose la position absolue du root bone à
+    // chaque frame. On calcule le DELTA (frame N - frame N-1), on l'applique
+    // à STATE.pos (le perso avance comme l'animation le dicte), puis on zeroing
+    // le bone visuellement.
+    // Pendant le crossfade (attackFading) : on zeroing seulement — STATE.pos
+    // est déjà à la bonne position, pas de delta négatif parasite.
+    const _attackFading = _prevAttackAction && _prevAttackAction.getEffectiveWeight() > 0.01;
+    if ((STATE.attackLock || _attackFading) && charRoot) {
+        if (!_rootMotionBone) {
+            charRoot.traverse(n => {
+                if (n.isBone && !n.parent?.isBone) _rootMotionBone = n;
+            });
+            if (_rootMotionBone) console.log('[RootMotion] bone :', _rootMotionBone.name);
+        }
+        if (_rootMotionBone) {
+            if (STATE.attackLock) {
+                // Delta réel du root motion ce frame
+                const dx = _rootMotionBone.position.x - _prevBoneX;
+                const dz = _rootMotionBone.position.z - _prevBoneZ;
+                _prevBoneX = _rootMotionBone.position.x;
+                _prevBoneZ = _rootMotionBone.position.z;
+                if (Math.abs(dx) > 1e-5 || Math.abs(dz) > 1e-5) {
+                    // Transformer espace local bone → espace monde
+                    const _rm = new THREE.Vector3(dx, 0, dz).applyQuaternion(charRoot.quaternion);
+                    STATE.pos.x += _rm.x;
+                    STATE.pos.z += _rm.z;
+                }
+            }
+            // Zeroing visuel dans tous les cas (attaque + crossfade)
+            _rootMotionBone.position.x = 0;
+            _rootMotionBone.position.z = 0;
+        }
+    } else {
+        _prevBoneX = 0;
+        _prevBoneZ = 0; // reset au repos pour le prochain déclenchement
+    }
+    if (_prevAttackAction && _prevAttackAction.getEffectiveWeight() <= 0.01) {
+        _prevAttackAction = null;
+    }
+
     if (Object.keys(boneOverrides).length) {
         applyIsolatedScales(charRoot, boneOverrides, boneRestPos);
     }
@@ -3395,6 +3660,9 @@ buildEmoteWheel();
         await new Promise(r => setTimeout(r, 600));
         document.getElementById('loading').style.display = 'none';
         showNotif('Bienvenue, ' + cfg.name + ' — I pour l\'inventaire · G pour les émotes');
+
+        // Épée dans le dos dès le départ (holster visuel)
+        _attachToBack('sword');
     } catch(e) {
         console.error(e);
         setLoadSub('Erreur chargement : ' + e.message);
