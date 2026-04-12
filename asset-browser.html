@@ -8,125 +8,124 @@
 body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
        display:flex; height:100vh; overflow:hidden; }
 
-/* ── Sidebar ── */
-#sidebar {
-    width:340px; flex-shrink:0; background:#080a0c;
+/* ══ Panneau inventaire ════════════════════════════════════════ */
+#panel {
+    width:272px; flex-shrink:0; background:#080a0c;
     border-right:1px solid rgba(200,184,154,0.08);
     display:flex; flex-direction:column; overflow:hidden;
+    transition:width 0.2s ease, border-color 0.2s;
 }
-#sidebar-header {
-    padding:12px 12px 10px;
-    border-bottom:1px solid rgba(200,184,154,0.08);
+#panel.panel-closed { width:0; border-color:transparent; }
+
+/* En-tête */
+#panel-header {
+    padding:10px 10px 0;
     flex-shrink:0;
 }
-#sidebar-title {
-    font-size:9px; letter-spacing:4px; text-transform:uppercase;
-    color:rgba(200,184,154,0.35); margin-bottom:10px;
+#panel-title-row {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:8px;
 }
+#panel-title {
+    font-size:8px; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3);
+}
+#panel-close {
+    background:none; border:none; color:rgba(200,184,154,0.28);
+    font-size:14px; line-height:1; cursor:pointer; padding:0 2px;
+    transition:color 0.12s; font-family:'Georgia',serif;
+}
+#panel-close:hover { color:rgba(200,184,154,0.75); }
 
-/* Tabs */
-#tabs { display:flex; gap:2px; flex-wrap:wrap; }
+/* Onglets catégorie */
+#tabs {
+    display:flex; gap:2px; flex-wrap:wrap;
+    padding-bottom:8px;
+    border-bottom:1px solid rgba(200,184,154,0.07);
+}
 .tab {
-    flex:1; min-width:0; padding:6px 4px; font-size:8px; letter-spacing:1px;
-    text-transform:uppercase; text-align:center; cursor:pointer;
+    padding:5px 8px; font-size:7.5px; letter-spacing:1px;
+    text-transform:uppercase; cursor:pointer;
     background:rgba(200,184,154,0.04); border:1px solid rgba(200,184,154,0.1);
-    color:rgba(200,184,154,0.4); transition:all 0.12s; white-space:nowrap;
+    color:rgba(200,184,154,0.38); transition:all 0.12s; white-space:nowrap;
 }
-.tab:hover  { background:rgba(200,184,154,0.08); color:rgba(200,184,154,0.7); }
-.tab.active { background:rgba(200,184,154,0.14); color:#c8b89a;
-              border-color:rgba(200,184,154,0.35); }
+.tab:hover  { background:rgba(200,184,154,0.09); color:rgba(200,184,154,0.7); }
+.tab.active { background:rgba(200,184,154,0.13); color:#c8b89a;
+              border-color:rgba(200,184,154,0.3); }
 
-/* Search */
-#search-wrap { padding:7px 8px; border-bottom:1px solid rgba(200,184,154,0.06); flex-shrink:0; }
+/* Recherche */
+#search-wrap {
+    position:relative; flex-shrink:0;
+    border-bottom:1px solid rgba(200,184,154,0.07);
+}
 #search {
-    width:100%; background:rgba(200,184,154,0.05); border:1px solid rgba(200,184,154,0.1);
-    color:#c8b89a; padding:7px 10px; font-family:'Georgia',serif;
-    font-size:10px; letter-spacing:1px; outline:none;
+    width:100%; background:transparent; border:none;
+    color:#c8b89a; padding:9px 32px 9px 12px;
+    font-family:'Georgia',serif; font-size:10.5px; outline:none;
+    letter-spacing:0.3px;
 }
-#search::placeholder { color:rgba(200,184,154,0.2); }
-#search:focus { border-color:rgba(200,184,154,0.3); }
+#search::placeholder { color:rgba(200,184,154,0.22); font-style:italic; }
+#search:focus { background:rgba(200,184,154,0.04); }
+#search-clear {
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:rgba(200,184,154,0.3);
+    font-size:13px; cursor:pointer; display:none; line-height:1; padding:0;
+}
+#search-clear.visible { display:block; }
+#search-clear:hover { color:rgba(200,184,154,0.75); }
 
-/* Thumbnail grid */
-#model-grid {
-    display:grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap:4px;
-    padding:6px;
-    overflow-y:auto;
-    flex:1;
-    scrollbar-width:thin; scrollbar-color:#2a2418 transparent;
-    align-content: start;
+/* ── Liste d'assets ── */
+#item-list {
+    flex:1; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:#2a2010 transparent;
 }
-.thumb-card {
-    cursor:pointer;
-    border:1px solid rgba(200,184,154,0.08);
-    background:rgba(0,0,0,0.3);
-    display:flex; flex-direction:column; align-items:center;
-    padding:4px 4px 5px;
-    transition:border-color 0.12s, background 0.12s;
-    position:relative; overflow:hidden;
+#item-list::-webkit-scrollbar { width:4px; }
+#item-list::-webkit-scrollbar-thumb { background:#2a2010; border-radius:2px; }
+
+.list-subcat {
+    padding:8px 12px 3px;
+    font-size:7.5px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(200,184,154,0.22);
+    border-bottom:1px solid rgba(200,184,154,0.05);
+    position:sticky; top:0; background:#080a0c; z-index:1;
 }
-.thumb-card:hover {
-    border-color:rgba(200,184,154,0.28);
-    background:rgba(200,184,154,0.04);
+.list-item {
+    display:flex; align-items:center;
+    padding:7px 14px; cursor:pointer;
+    border-bottom:1px solid rgba(200,184,154,0.035);
+    color:rgba(200,184,154,0.58); font-size:10.5px; letter-spacing:0.3px;
+    transition:background 0.1s, color 0.1s, border-left 0.1s;
+    border-left:2px solid transparent;
 }
-.thumb-card.active {
-    border-color:rgba(212,168,75,0.55);
-    background:rgba(212,168,75,0.05);
+.list-item:hover { background:rgba(200,184,154,0.06); color:#d8c8a8; }
+.list-item.active {
+    background:rgba(212,168,75,0.08); color:#d4a84b;
+    border-left-color:rgba(212,168,75,0.5);
 }
-.thumb-img {
-    width:100%; aspect-ratio:1; display:block;
-    object-fit:cover; background:#0a0c0f;
-}
-.thumb-card.loading .thumb-img {
-    background: repeating-linear-gradient(
-        45deg,
-        rgba(200,184,154,0.03) 0px, rgba(200,184,154,0.03) 4px,
-        transparent 4px, transparent 8px
-    );
-}
-.thumb-card.thumb-error .thumb-img {
-    background:#0a0c0f;
-}
-.thumb-card.thumb-error::before {
-    content:'⚠';
-    position:absolute; top:50%; left:50%;
-    transform:translate(-50%,-70%);
-    font-size:16px; opacity:0.2;
-}
-.thumb-name {
-    font-size:8px; letter-spacing:0.3px;
-    color:rgba(200,184,154,0.45); text-align:center;
-    margin-top:4px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    max-width:100%; width:100%;
-}
-.thumb-card.active .thumb-name { color:rgba(212,168,75,0.8); }
 
 #model-count {
-    padding:6px 10px; font-size:9px; letter-spacing:2px;
-    color:rgba(200,184,154,0.2);
+    padding:5px 12px; font-size:8px; letter-spacing:2px;
+    color:rgba(200,184,154,0.18);
     border-top:1px solid rgba(200,184,154,0.06);
     flex-shrink:0;
 }
 
-/* ── Anim panel ── */
+/* ── Panel animations ── */
 #anim-panel {
     border-top:1px solid rgba(200,184,154,0.08);
-    display:none; flex-direction:column; max-height:40%;
+    display:none; flex-direction:column; max-height:38%;
     flex-shrink:0;
 }
 #anim-header {
-    padding:7px 12px; font-size:9px; letter-spacing:3px;
-    text-transform:uppercase; color:rgba(200,184,154,0.3);
+    padding:7px 12px; font-size:8px; letter-spacing:3px;
+    text-transform:uppercase; color:rgba(200,184,154,0.28);
     flex-shrink:0;
 }
 #anim-search {
     background:rgba(200,184,154,0.04); border:none;
     border-bottom:1px solid rgba(200,184,154,0.08);
     color:#c8b89a; padding:7px 12px; font-family:'Georgia',serif;
-    font-size:10px; letter-spacing:1px; outline:none; width:100%;
-    flex-shrink:0;
+    font-size:10px; outline:none; width:100%; flex-shrink:0;
 }
 #anim-search::placeholder { color:rgba(200,184,154,0.2); }
 #clip-list {
@@ -137,35 +136,36 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
     padding:6px 12px; font-size:9px; letter-spacing:0.3px;
     cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
     transition:background 0.1s; display:flex; justify-content:space-between;
+    color:rgba(200,184,154,0.6);
 }
-.clip-item:hover  { background:rgba(200,184,154,0.07); }
-.clip-item.active { background:rgba(200,184,154,0.14); color:#fff; }
+.clip-item:hover  { background:rgba(200,184,154,0.07); color:#d8c8a8; }
+.clip-item.active { background:rgba(200,184,154,0.13); color:#fff; }
 .clip-item .dur   { font-size:9px; opacity:0.3; }
 
-/* Sous-catégorie header */
-.subcat-header {
-    grid-column: 1 / -1;
-    font-size: 8px; letter-spacing: 3px; text-transform: uppercase;
-    color: rgba(200,184,154,0.25);
-    padding: 8px 4px 3px;
-    border-bottom: 1px solid rgba(200,184,154,0.06);
-    margin-bottom: 1px;
-}
-.subcat-header:first-child { padding-top: 3px; }
-
-/* ── Viewport ── */
+/* ══ Viewport ══════════════════════════════════════════════════ */
 #viewport { flex:1; position:relative; background:#111418; }
 #viewport canvas { display:block; width:100% !important; height:100% !important; }
 
+/* Bouton réouverture */
+#panel-open {
+    position:absolute; top:10px; left:10px; z-index:10;
+    background:rgba(8,6,4,0.85); border:1px solid rgba(200,184,154,0.2);
+    color:rgba(200,184,154,0.5); font-size:13px; cursor:pointer;
+    padding:5px 10px; display:none;
+    transition:color 0.12s, border-color 0.12s;
+}
+#panel-open.visible { display:block; }
+#panel-open:hover { color:#d8c8a8; border-color:rgba(200,184,154,0.45); }
+
 #vp-label {
-    position:absolute; top:16px; left:50%; transform:translateX(-50%);
-    color:rgba(200,184,154,0.5); font-size:11px; letter-spacing:3px;
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    color:rgba(200,184,154,0.45); font-size:11px; letter-spacing:3px;
     text-transform:uppercase; pointer-events:none; text-align:center;
     line-height:1.8; white-space:pre; text-shadow:0 1px 4px rgba(0,0,0,0.8);
 }
 #vp-hint {
-    position:absolute; bottom:16px; right:16px;
-    color:rgba(200,184,154,0.18); font-size:9px; letter-spacing:1px;
+    position:absolute; bottom:14px; right:14px;
+    color:rgba(200,184,154,0.15); font-size:9px; letter-spacing:1px;
     line-height:2; text-align:right; pointer-events:none;
 }
 #vp-loading {
@@ -185,10 +185,13 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
 </head>
 <body>
 
-<!-- ── Sidebar ── -->
-<div id="sidebar">
-    <div id="sidebar-header">
-        <div id="sidebar-title">Asset Browser</div>
+<!-- ══ Panneau inventaire ═══════════════════════════════════════ -->
+<div id="panel">
+    <div id="panel-header">
+        <div id="panel-title-row">
+            <span id="panel-title">Asset Browser</span>
+            <button id="panel-close" title="Fermer le panneau">✕</button>
+        </div>
         <div id="tabs">
             <div class="tab active" data-cat="Personnages">Perso</div>
             <div class="tab" data-cat="Cheveux">Cheveux</div>
@@ -198,23 +201,23 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
         </div>
     </div>
     <div id="search-wrap">
-        <input id="search" type="text" placeholder="Filtrer...">
+        <input id="search" type="text" placeholder="Rechercher…" autocomplete="off">
+        <button id="search-clear" title="Effacer">✕</button>
     </div>
-    <div id="model-grid"></div>
+    <div id="item-list"></div>
     <div id="model-count">—</div>
-
-    <!-- Panel animations (personnages seulement) -->
     <div id="anim-panel">
         <div id="anim-header">Animations</div>
-        <input id="anim-search" type="text" placeholder="Filtrer clips...">
+        <input id="anim-search" type="text" placeholder="Filtrer clips…">
         <div id="clip-list"></div>
     </div>
 </div>
 
-<!-- ── Viewport ── -->
+<!-- ══ Viewport ════════════════════════════════════════════════ -->
 <div id="viewport">
+    <button id="panel-open" title="Ouvrir le panneau">☰</button>
     <div id="vp-label">Sélectionne un asset</div>
-    <div id="vp-loading">Chargement...</div>
+    <div id="vp-loading">Chargement…</div>
     <div id="vp-hint">Clic droit : orbiter · Molette : zoom · Clic milieu : pan</div>
 </div>
 
@@ -225,7 +228,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // ═══════════════════════════════════════════════════════════════
-//  CATALOGUE D'ASSETS
+//  CATALOGUE — { catégorie: { sous-cat: [items] } }
 // ═══════════════════════════════════════════════════════════════
 const BASE_OUTFIT  = 'assets/characters/outfits/';
 const BASE_HAIR    = 'assets/characters/hair/';
@@ -241,16 +244,23 @@ const UAL_PATHS = [
     'assets/characters/animations/UAL2_Source.glb',
 ];
 
-// CATALOG — structure { catégorie: { sous-catégorie: [items] } }
 const CATALOG = {
     'Personnages': {
         'Masculin': [
-            { name:'Male Ranger',  src: BASE_OUTFIT+'Male_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_M },
-            { name:'Male Peasant', src: BASE_OUTFIT+'Male_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Ranger',       src: BASE_OUTFIT+'Male_Ranger.gltf',       animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Peasant',      src: BASE_OUTFIT+'Male_Peasant.gltf',      animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Knight',       src: BASE_OUTFIT+'Male_Knight.gltf',       animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Knight Cloth', src: BASE_OUTFIT+'Male_Knight_Cloth.gltf', animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Noble',        src: BASE_OUTFIT+'Male_Noble.gltf',        animated:true, bodyUrl: BASE_BODY_M },
+            { name:'Male Wizard',       src: BASE_OUTFIT+'Male_Wizard.gltf',       animated:true, bodyUrl: BASE_BODY_M },
         ],
         'Féminin': [
-            { name:'Female Ranger',  src: BASE_OUTFIT+'Female_Ranger.gltf',  animated:true, bodyUrl: BASE_BODY_F },
-            { name:'Female Peasant', src: BASE_OUTFIT+'Female_Peasant.gltf', animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Ranger',       src: BASE_OUTFIT+'Female_Ranger.gltf',       animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Peasant',      src: BASE_OUTFIT+'Female_Peasant.gltf',      animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Knight',       src: BASE_OUTFIT+'Female_Knight.gltf',       animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Knight Cloth', src: BASE_OUTFIT+'Female_Knight_Cloth.gltf', animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Noble',        src: BASE_OUTFIT+'Female_Noble.gltf',        animated:true, bodyUrl: BASE_BODY_F },
+            { name:'Female Wizard',       src: BASE_OUTFIT+'Female_Wizard.gltf',       animated:true, bodyUrl: BASE_BODY_F },
         ],
     },
     'Cheveux': {
@@ -358,14 +368,12 @@ const CATALOG = {
     },
 };
 
-// Aplatir une catégorie pour la recherche et le comptage
 function flattenCat(cat) {
-    const subs = CATALOG[cat];
-    return Object.values(subs).flat();
+    return Object.values(CATALOG[cat] || {}).flat();
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SCÈNE PRINCIPALE
+//  SCÈNE 3D
 // ═══════════════════════════════════════════════════════════════
 const vp = document.getElementById('viewport');
 const scene = new THREE.Scene();
@@ -421,27 +429,8 @@ const grid = new THREE.GridHelper(20, 20, 0x201810, 0x1a140c);
 grid.position.y = 0.001; scene.add(grid);
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDERER OFFSCREEN — génération des thumbnails
+//  LOADER / CACHE
 // ═══════════════════════════════════════════════════════════════
-const THUMB_SIZE = 160;
-const thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-thumbR.setSize(THUMB_SIZE, THUMB_SIZE);
-thumbR.setPixelRatio(1);
-thumbR.outputColorSpace = THREE.SRGBColorSpace;
-
-const thumbScene = new THREE.Scene();
-thumbScene.background = new THREE.Color(0x161c24);
-const thumbCam = new THREE.PerspectiveCamera(38, 1, 0.001, 2000);
-
-// Éclairage thumbnail : lumineux, 3 points bien définis
-thumbScene.add(new THREE.AmbientLight(0xfff0e0, 1.8));
-const tKey = new THREE.DirectionalLight(0xfff5e0, 3.5);
-tKey.position.set(3, 6, 4); thumbScene.add(tKey);
-const tFill = new THREE.DirectionalLight(0x90aacc, 1.2);
-tFill.position.set(-4, 2, -1); thumbScene.add(tFill);
-const tRim = new THREE.DirectionalLight(0xffcc88, 1.6);
-tRim.position.set(1, 3, -5); thumbScene.add(tRim);
-
 const gltfLoader = new GLTFLoader();
 const _gltfCache = {};
 
@@ -452,102 +441,8 @@ function loadGLTF(url) {
     );
 }
 
-let _thumbRoot = null;
-function _clearThumbScene() {
-    if (!_thumbRoot) return;
-    thumbScene.remove(_thumbRoot);
-    _thumbRoot.traverse(n => {
-        if (n.geometry) n.geometry.dispose();
-        if (n.material) {
-            (Array.isArray(n.material) ? n.material : [n.material])
-                .forEach(m => m?.dispose());
-        }
-    });
-    _thumbRoot = null;
-}
-
-async function renderThumb(item) {
-    _clearThumbScene();
-    const gltf = await loadGLTF(item.src);
-    const root = gltf.scene.clone(true);
-    root.traverse(c => {
-        if (!c.isMesh) return;
-        c.frustumCulled = false;
-        const mats = Array.isArray(c.material) ? c.material : [c.material];
-        mats.forEach(m => { if (m) { m.side = THREE.DoubleSide; m.clippingPlanes = []; } });
-    });
-
-    // 1. Ajouter à la scène avant de calculer la bbox (certains objets en ont besoin)
-    thumbScene.add(root);
-    _thumbRoot = root;
-
-    // 2. Centrer sur la bbox réelle
-    const box = new THREE.Box3().setFromObject(root);
-    const center = box.getCenter(new THREE.Vector3());
-    root.position.sub(center);
-
-    // 3. Rotation 3/4 pour un meilleur angle de présentation
-    root.rotation.y = Math.PI / 6;  // 30° autour de Y
-
-    // 4. Bounding sphere APRÈS centrage → distance caméra dynamique
-    const sphere = new THREE.Sphere();
-    new THREE.Box3().setFromObject(root).getBoundingSphere(sphere);
-    const radius = Math.max(sphere.radius, 0.01);
-
-    // dist = radius / tan(halfFov)  avec 20% de marge
-    const halfFovRad = (thumbCam.fov / 2) * Math.PI / 180;
-    const dist = (radius / Math.tan(halfFovRad)) * 1.22;
-
-    // Angle 3/4 : légèrement sur le côté et au-dessus
-    thumbCam.position.set(dist * 0.45, dist * 0.38, dist * 0.88);
-    thumbCam.lookAt(sphere.center);
-    thumbCam.near = dist * 0.005;
-    thumbCam.far  = dist * 20;
-    thumbCam.updateProjectionMatrix();
-
-    thumbR.render(thumbScene, thumbCam);
-    return thumbR.domElement.toDataURL('image/jpeg', 0.88);
-}
-
-// Queue séquentielle avec IntersectionObserver
-const _thumbQueue = [];
-let _thumbBusy = false;
-
-async function _processQueue() {
-    if (_thumbBusy) return;
-    _thumbBusy = true;
-    while (_thumbQueue.length > 0) {
-        const { item, card, img } = _thumbQueue.shift();
-        if (!card.isConnected) continue;
-        try {
-            const url = await renderThumb(item);
-            img.src = url;
-            card.classList.remove('loading');
-        } catch {
-            card.classList.remove('loading');
-            card.classList.add('thumb-error');
-        }
-    }
-    _thumbBusy = false;
-}
-
-const _thumbObserver = new IntersectionObserver(entries => {
-    let added = false;
-    for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        _thumbObserver.unobserve(e.target);
-        const card = e.target;
-        if (card._thumbDone) continue;
-        card._thumbDone = true;
-        const img = card.querySelector('.thumb-img');
-        _thumbQueue.push({ item: card._item, card, img });
-        added = true;
-    }
-    if (added) _processQueue();
-}, { root: document.getElementById('model-grid'), rootMargin: '80px' });
-
 // ═══════════════════════════════════════════════════════════════
-//  ÉTAT SCÈNE PRINCIPALE
+//  ÉTAT SCÈNE
 // ═══════════════════════════════════════════════════════════════
 let currentMdl = null, mixer = null, activeAction = null;
 let ualLoaded  = false;
@@ -559,7 +454,7 @@ async function loadUAL() {
     if (ualLoaded) return;
     allClips = [];
     document.getElementById('clip-list').innerHTML =
-        '<div style="padding:8px 14px;font-size:9px;opacity:.3;letter-spacing:2px">CHARGEMENT...</div>';
+        '<div style="padding:8px 14px;font-size:9px;opacity:.3;letter-spacing:2px">CHARGEMENT…</div>';
     const results = await Promise.allSettled(UAL_PATHS.map(p => loadGLTF(p)));
     const clipMap = new Map();
     for (const r of results) {
@@ -573,7 +468,7 @@ async function loadUAL() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ATTACHEMENT CORPS DE BASE
+//  CORPS DE BASE (personnages)
 // ═══════════════════════════════════════════════════════════════
 const HEAD_MESHES = new Set(['Eyebrows', 'Eyes', 'SuperHero_Male', 'SuperHero_Female']);
 
@@ -608,7 +503,7 @@ function attachBody(baseGltf, outfitRoot) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CHARGEMENT MODÈLE (viewport principal)
+//  CHARGEMENT MODÈLE
 // ═══════════════════════════════════════════════════════════════
 function loadModel(item) {
     if (activeAction) { activeAction.stop(); activeAction = null; }
@@ -669,7 +564,7 @@ function loadModel(item) {
     });
 }
 
-// ── Clips ──────────────────────────────────────────────────────
+// ── Clips animations ───────────────────────────────────────────
 function rebuildClips() {
     if (!ualLoaded || !mixer) return;
     renderClipList();
@@ -706,88 +601,108 @@ function playClip(clip) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  UI — GRILLE DE THUMBNAILS
+//  UI — LISTE D'ASSETS
 // ═══════════════════════════════════════════════════════════════
-let currentCat = 'Personnages';
-let searchTerm = '';
+let currentCat  = 'Personnages';
+let searchTerm  = '';
+let selectedItem = null;
 
-function _appendCard(el, item) {
-    const card = document.createElement('div');
-    card.className = 'thumb-card loading';
-    card._item = item;
-
-    const img = document.createElement('img');
-    img.className = 'thumb-img';
-    img.alt = item.name;
-
-    const label = document.createElement('div');
-    label.className = 'thumb-name';
-    label.textContent = item.name;
-
-    card.appendChild(img);
-    card.appendChild(label);
-    card.addEventListener('click', () => {
-        document.querySelectorAll('.thumb-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        loadModel(item);
-    });
-    el.appendChild(card);
-    _thumbObserver.observe(card);
-}
-
-function renderGrid() {
+function renderList() {
     const subs    = CATALOG[currentCat] || {};
     const allItems = flattenCat(currentCat);
     const term     = searchTerm.toLowerCase();
-    const el       = document.getElementById('model-grid');
+    const el       = document.getElementById('item-list');
     el.innerHTML   = '';
 
+    const makeRow = (item) => {
+        const row = document.createElement('div');
+        row.className = 'list-item' + (selectedItem === item ? ' active' : '');
+        row.textContent = item.name;
+        row.addEventListener('click', () => {
+            document.querySelectorAll('.list-item').forEach(r => r.classList.remove('active'));
+            row.classList.add('active');
+            selectedItem = item;
+            loadModel(item);
+        });
+        el.appendChild(row);
+    };
+
     if (term) {
-        // Mode recherche — liste plate sans headers
         const filtered = allItems.filter(i => i.name.toLowerCase().includes(term));
-        for (const item of filtered) _appendCard(el, item);
+        filtered.forEach(makeRow);
         document.getElementById('model-count').textContent =
             filtered.length + ' / ' + allItems.length + ' assets';
     } else {
-        // Mode normal — headers par sous-catégorie
         for (const [subName, items] of Object.entries(subs)) {
             if (!items.length) continue;
             const hdr = document.createElement('div');
-            hdr.className = 'subcat-header';
+            hdr.className = 'list-subcat';
             hdr.textContent = subName;
             el.appendChild(hdr);
-            for (const item of items) _appendCard(el, item);
+            items.forEach(makeRow);
         }
-        document.getElementById('model-count').textContent =
-            allItems.length + ' assets';
+        document.getElementById('model-count').textContent = allItems.length + ' assets';
     }
 }
 
-// Tabs
+// ── Onglets ────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentCat = tab.dataset.cat;
         document.getElementById('search').value = '';
+        document.getElementById('search-clear').classList.remove('visible');
         searchTerm = '';
         if (currentCat !== 'Personnages')
             document.getElementById('anim-panel').style.display = 'none';
-        renderGrid();
+        renderList();
     });
 });
 
+// ── Recherche ──────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', e => {
     searchTerm = e.target.value;
-    renderGrid();
+    document.getElementById('search-clear').classList.toggle('visible', searchTerm.length > 0);
+    renderList();
+});
+document.getElementById('search-clear').addEventListener('click', () => {
+    document.getElementById('search').value = '';
+    document.getElementById('search-clear').classList.remove('visible');
+    searchTerm = '';
+    renderList();
+    document.getElementById('search').focus();
 });
 
+// ── Animations ────────────────────────────────────────────────
 document.getElementById('anim-search').addEventListener('input', e => {
     animFilter = e.target.value;
     renderClipList();
 });
 
-renderGrid();
+// ── Toggle panneau ────────────────────────────────────────────
+document.getElementById('panel-close').addEventListener('click', () => {
+    document.getElementById('panel').classList.add('panel-closed');
+    document.getElementById('panel-open').classList.add('visible');
+    // Resize renderer après la transition
+    setTimeout(() => {
+        renderer.setSize(vp.clientWidth, vp.clientHeight);
+        camera.aspect = vp.clientWidth / vp.clientHeight;
+        camera.updateProjectionMatrix();
+    }, 220);
+});
+document.getElementById('panel-open').addEventListener('click', () => {
+    document.getElementById('panel').classList.remove('panel-closed');
+    document.getElementById('panel-open').classList.remove('visible');
+    setTimeout(() => {
+        renderer.setSize(vp.clientWidth, vp.clientHeight);
+        camera.aspect = vp.clientWidth / vp.clientHeight;
+        camera.updateProjectionMatrix();
+    }, 220);
+});
+
+// ── Init ──────────────────────────────────────────────────────
+renderList();
 
 // ═══════════════════════════════════════════════════════════════
 //  BOUCLE

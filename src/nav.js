@@ -36,7 +36,6 @@
         { label: 'Anim Inspector',  id: 'anim-inspect',      icon: '▶',  cat: null },
         { label: 'Asset Browser',   id: 'asset-browser',     icon: '❖',  cat: 'Environnement' },
         { label: 'Village Browser', id: 'village-browser',   icon: '⌂',  cat: null },
-        { label: 'Nature Browser',  id: 'nature-browser',    icon: '✦',  cat: null },
         { label: 'Soldier Test',    id: 'soldier-test',      icon: '◆',  cat: 'Test' },
     ];
 
