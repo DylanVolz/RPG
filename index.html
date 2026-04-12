@@ -5,265 +5,305 @@
 <title>Three.js Game Editor</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100vh; overflow:hidden; background:#070503; font-family:'Georgia',serif; color:#c8b89a; }
 
-body {
-    background: #070503;
-    font-family: 'Georgia', serif;
-    color: #c8b89a;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 52px 24px 64px;
+/* ══ Barre d'onglets shell ══════════════════════════════════════ */
+#shell-bar {
+    display:flex; align-items:stretch;
+    height:36px; flex-shrink:0;
+    background:rgba(5,3,1,0.98);
+    border-bottom:1px solid rgba(200,184,154,0.09);
+    overflow:hidden; position:relative; z-index:10;
 }
+#shell-brand {
+    display:flex; align-items:center;
+    padding:0 16px;
+    font-size:8px; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.3);
+    border-right:1px solid rgba(200,184,154,0.07);
+    white-space:nowrap; flex-shrink:0; cursor:pointer;
+    transition:color 0.15s;
+}
+#shell-brand:hover { color:rgba(200,184,154,0.6); }
+#shell-brand.active { color:rgba(200,184,154,0.55); }
 
-/* ── En-tête ────────────────────────────────────────────────── */
+#shell-tabs {
+    display:flex; align-items:stretch;
+    overflow-x:auto; flex:1;
+    scrollbar-width:none;
+}
+#shell-tabs::-webkit-scrollbar { display:none; }
+
+.s-tab {
+    display:flex; align-items:center; gap:6px;
+    padding:0 13px; flex-shrink:0;
+    font-size:8px; letter-spacing:1.5px; text-transform:uppercase;
+    color:rgba(200,184,154,0.28); cursor:pointer;
+    border-right:1px solid rgba(200,184,154,0.05);
+    transition:color 0.12s, background 0.12s;
+    position:relative; white-space:nowrap;
+}
+.s-tab:hover { color:rgba(200,184,154,0.65); background:rgba(200,184,154,0.04); }
+.s-tab.active { color:#c8b89a; background:rgba(200,184,154,0.07); }
+.s-tab.active::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:rgba(212,168,75,0.55);
+}
+.s-tab.primary { color:rgba(212,168,75,0.38); }
+.s-tab.primary:hover { color:rgba(212,168,75,0.7); }
+.s-tab.primary.active { color:#d4a84b; }
+.s-tab.primary.active::after { background:rgba(212,168,75,0.75); }
+.s-icon { font-size:10px; opacity:0.75; }
+
+/* ══ Zone de contenu ════════════════════════════════════════════ */
+#content { position:relative; width:100%; height:calc(100vh - 36px); }
+
+/* Home screen */
+#home {
+    position:absolute; inset:0;
+    overflow-y:auto; background:#070503;
+    display:none; flex-direction:column; align-items:center;
+    padding:44px 24px 64px;
+}
+#home.active { display:flex; }
+
+/* Iframes */
+.t-frame {
+    position:absolute; inset:0;
+    border:none; width:100%; height:100%;
+    display:none; background:#070503;
+}
+.t-frame.active { display:block; }
+
+/* ══ Hub home (reprise de l'ancien style) ═══════════════════════ */
 .studio-label {
-    font-size: 9px;
-    letter-spacing: 6px;
-    text-transform: uppercase;
-    color: rgba(200,184,154,0.28);
-    margin-bottom: 14px;
+    font-size:9px; letter-spacing:6px; text-transform:uppercase;
+    color:rgba(200,184,154,0.28); margin-bottom:14px;
 }
-
 .project-title {
-    font-size: 30px;
-    letter-spacing: 10px;
-    text-transform: uppercase;
-    color: #d0c0a0;
-    margin-bottom: 8px;
-    text-shadow: 0 0 40px rgba(200,168,100,0.12);
+    font-size:28px; letter-spacing:9px; text-transform:uppercase; color:#d0c0a0;
+    margin-bottom:8px; text-shadow:0 0 40px rgba(200,168,100,0.12);
 }
+.ornament { font-size:10px; letter-spacing:12px; color:rgba(200,184,154,0.15); margin-bottom:44px; }
 
-.ornament {
-    font-size: 10px;
-    letter-spacing: 12px;
-    color: rgba(200,184,154,0.15);
-    margin-bottom: 52px;
+.hub-grid {
+    display:grid; grid-template-columns:repeat(3,1fr);
+    gap:10px; max-width:860px; width:100%;
 }
+.hub-section {
+    grid-column:1/-1; font-size:8px; letter-spacing:5px; text-transform:uppercase;
+    color:rgba(200,184,154,0.2); border-bottom:1px solid rgba(200,184,154,0.07);
+    padding-bottom:7px; margin-top:18px;
+}
+.hub-section:first-of-type { margin-top:0; }
 
-/* ── Grille ─────────────────────────────────────────────────── */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    max-width: 880px;
-    width: 100%;
+.hub-card {
+    display:flex; flex-direction:column;
+    background:rgba(11,9,5,0.9); border:1px solid rgba(200,184,154,0.10);
+    padding:18px 18px 16px; cursor:pointer; position:relative;
+    transition:border-color 0.18s, background 0.18s; overflow:hidden;
 }
+.hub-card::after {
+    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(200,184,154,0.12),transparent);
+    transition:background 0.2s;
+}
+.hub-card:hover { border-color:rgba(200,184,154,0.28); background:rgba(18,14,8,0.95); }
+.hub-card:hover::after { background:linear-gradient(90deg,transparent,rgba(200,184,154,0.22),transparent); }
+.hub-card.primary { border-color:rgba(200,160,60,0.22); background:rgba(13,10,5,0.95); }
+.hub-card.primary::after { background:linear-gradient(90deg,transparent,rgba(212,168,75,0.22),transparent); }
+.hub-card.primary:hover { border-color:rgba(200,160,60,0.45); background:rgba(18,14,7,0.98); }
+.hub-card.primary:hover::after { background:linear-gradient(90deg,transparent,rgba(212,168,75,0.32),transparent); }
 
-.section-header {
-    grid-column: 1 / -1;
-    font-size: 8px;
-    letter-spacing: 5px;
-    text-transform: uppercase;
-    color: rgba(200,184,154,0.2);
-    border-bottom: 1px solid rgba(200,184,154,0.07);
-    padding-bottom: 8px;
-    margin-top: 20px;
-}
-.section-header:first-child { margin-top: 0; }
-
-/* ── Cartes ─────────────────────────────────────────────────── */
-.card {
-    display: flex;
-    flex-direction: column;
-    background: rgba(11,9,5,0.9);
-    border: 1px solid rgba(200,184,154,0.10);
-    padding: 20px 20px 18px;
-    text-decoration: none;
-    color: inherit;
-    cursor: pointer;
-    position: relative;
-    transition: border-color 0.18s, background 0.18s;
-    overflow: hidden;
-}
-
-.card::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(200,184,154,0.12), transparent);
-    transition: background 0.2s;
-}
-
-.card:hover {
-    border-color: rgba(200,184,154,0.28);
-    background: rgba(18,14,8,0.95);
-}
-.card:hover::after {
-    background: linear-gradient(90deg, transparent, rgba(200,184,154,0.22), transparent);
-}
-
-/* Carte primaire (Gameplay) */
-.card.primary {
-    border-color: rgba(200,160,60,0.22);
-    background: rgba(13,10,5,0.95);
-}
-.card.primary::after {
-    background: linear-gradient(90deg, transparent, rgba(212,168,75,0.22), transparent);
-}
-.card.primary:hover {
-    border-color: rgba(200,160,60,0.45);
-    background: rgba(18,14,7,0.98);
-}
-
-.card-icon {
-    font-size: 20px;
-    opacity: 0.55;
-    margin-bottom: 14px;
-    line-height: 1;
-}
-.card.primary .card-icon { opacity: 0.8; }
-
-.card-cat {
-    font-size: 8px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: rgba(200,184,154,0.28);
-    margin-bottom: 5px;
-}
-
-.card-name {
-    font-size: 14px;
-    letter-spacing: 1.5px;
-    color: #d8c8a8;
-    margin-bottom: 10px;
-}
-.card.primary .card-name { color: #d4a84b; }
-
-.card-desc {
-    font-size: 11px;
-    line-height: 1.75;
-    color: rgba(200,184,154,0.38);
-    font-style: italic;
-    flex: 1;
-}
-
-.card-cta {
-    margin-top: 16px;
-    font-size: 9px;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: rgba(200,184,154,0.2);
-    transition: color 0.15s;
-}
-.card:hover .card-cta { color: rgba(200,184,154,0.55); }
-.card.primary .card-cta { color: rgba(212,168,75,0.35); }
-.card.primary:hover .card-cta { color: rgba(212,168,75,0.75); }
-
-/* ── Touches rapides ─────────────────────────────────────────── */
-.hotkeys {
-    margin-top: 48px;
-    font-size: 9px;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: rgba(200,184,154,0.15);
-    text-align: center;
-    line-height: 2;
-}
+.hub-icon { font-size:18px; opacity:0.55; margin-bottom:12px; line-height:1; }
+.hub-card.primary .hub-icon { opacity:0.8; }
+.hub-cat { font-size:8px; letter-spacing:3px; text-transform:uppercase; color:rgba(200,184,154,0.28); margin-bottom:4px; }
+.hub-name { font-size:13px; letter-spacing:1.5px; color:#d8c8a8; margin-bottom:8px; }
+.hub-card.primary .hub-name { color:#d4a84b; }
+.hub-desc { font-size:11px; line-height:1.75; color:rgba(200,184,154,0.38); font-style:italic; flex:1; }
+.hub-cta { margin-top:14px; font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:rgba(200,184,154,0.2); transition:color 0.15s; }
+.hub-card:hover .hub-cta { color:rgba(200,184,154,0.55); }
+.hub-card.primary .hub-cta { color:rgba(212,168,75,0.35); }
+.hub-card.primary:hover .hub-cta { color:rgba(212,168,75,0.75); }
 </style>
 </head>
 <body>
 
-<div class="studio-label">Quaternius Studio</div>
-<div class="project-title">Three.js Game Editor</div>
-<div class="ornament">✦ &nbsp;&nbsp; ✦ &nbsp;&nbsp; ✦</div>
+<!-- ══ Barre d'onglets ══════════════════════════════════════════ -->
+<div id="shell-bar">
+    <div id="shell-brand" title="Accueil">TGE</div>
+    <div id="shell-tabs">
+        <div class="s-tab primary" data-tool="gameplay-test"><span class="s-icon">⚔</span>Gameplay</div>
+        <div class="s-tab" data-tool="char-builder"><span class="s-icon">◈</span>Char Builder</div>
+        <div class="s-tab" data-tool="char-combined"><span class="s-icon">◉</span>Char Combiné</div>
+        <div class="s-tab" data-tool="character-preview"><span class="s-icon">◎</span>Char Preview</div>
+        <div class="s-tab" data-tool="anim-inspect"><span class="s-icon">▶</span>Animations</div>
+        <div class="s-tab" data-tool="asset-browser"><span class="s-icon">❖</span>Assets</div>
+        <div class="s-tab" data-tool="village-browser"><span class="s-icon">⌂</span>Village</div>
+        <div class="s-tab" data-tool="nature-browser"><span class="s-icon">✦</span>Nature</div>
+        <div class="s-tab" data-tool="soldier-test"><span class="s-icon">◆</span>Soldier</div>
+    </div>
+</div>
 
-<div class="grid">
+<!-- ══ Contenu ══════════════════════════════════════════════════ -->
+<div id="content">
 
-    <!-- ── Gameplay ─────────────────────────────────────────── -->
-    <div class="section-header">Gameplay</div>
+    <!-- Hub -->
+    <div id="home" class="active">
+        <div class="studio-label">Quaternius Studio</div>
+        <div class="project-title">Three.js Game Editor</div>
+        <div class="ornament">✦ &nbsp;&nbsp; ✦ &nbsp;&nbsp; ✦</div>
 
-    <a class="card primary" href="gameplay-test.html" style="grid-column: span 3;">
-        <div class="card-icon">⚔</div>
-        <div class="card-cat">Prototype</div>
-        <div class="card-name">Gameplay Test</div>
-        <div class="card-desc">
-            Locomotion · Combat · Physique · Ville de Valcrest.
-            Prototype jouable complet — épée, bouclier, arc, magie.
+        <div class="hub-grid">
+            <div class="hub-section">Gameplay</div>
+            <div class="hub-card primary" data-open="gameplay-test" style="grid-column:span 3">
+                <div class="hub-icon">⚔</div>
+                <div class="hub-cat">Prototype</div>
+                <div class="hub-name">Gameplay Test</div>
+                <div class="hub-desc">Locomotion · Combat · Physique · Ville de Valcrest. Prototype jouable complet — épée, bouclier, arc, magie.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+
+            <div class="hub-section">Personnage</div>
+            <div class="hub-card" data-open="char-builder">
+                <div class="hub-icon">◈</div>
+                <div class="hub-cat">Character</div>
+                <div class="hub-name">Char Builder</div>
+                <div class="hub-desc">Assemblage modulaire — body, outfits, hair, beard. Shaders par zone de couleur.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+            <div class="hub-card" data-open="char-combined">
+                <div class="hub-icon">◉</div>
+                <div class="hub-cat">Character</div>
+                <div class="hub-name">Char Combiné</div>
+                <div class="hub-desc">Builder + aperçu plein corps côte à côte.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+            <div class="hub-card" data-open="character-preview">
+                <div class="hub-icon">◎</div>
+                <div class="hub-cat">Character</div>
+                <div class="hub-name">Char Preview</div>
+                <div class="hub-desc">Aperçu du personnage assemblé avec toutes ses animations actives.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+            <div class="hub-card" data-open="anim-inspect">
+                <div class="hub-icon">▶</div>
+                <div class="hub-cat">Animation</div>
+                <div class="hub-name">Anim Inspector</div>
+                <div class="hub-desc">Browse et preview de tous les clips d'animation (toutes librairies fusionnées).</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+
+            <div class="hub-section">Environnement</div>
+            <div class="hub-card" data-open="asset-browser">
+                <div class="hub-icon">❖</div>
+                <div class="hub-cat">Assets</div>
+                <div class="hub-name">Asset Browser</div>
+                <div class="hub-desc">Tous les assets Quaternius — filtre par catégorie, thumbnails 3D.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+            <div class="hub-card" data-open="village-browser">
+                <div class="hub-icon">⌂</div>
+                <div class="hub-cat">Environnement</div>
+                <div class="hub-name">Village Browser</div>
+                <div class="hub-desc">Browse et preview de toutes les pièces Medieval Village MegaKit.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+            <div class="hub-card" data-open="nature-browser">
+                <div class="hub-icon">✦</div>
+                <div class="hub-cat">Environnement</div>
+                <div class="hub-name">Nature Browser</div>
+                <div class="hub-desc">Arbres, rochers et végétation — browse et preview 3D.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+
+            <div class="hub-section">Test</div>
+            <div class="hub-card" data-open="soldier-test">
+                <div class="hub-icon">◆</div>
+                <div class="hub-cat">Test</div>
+                <div class="hub-name">Soldier Test</div>
+                <div class="hub-desc">Scène de test rapide — personnage et animations.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
         </div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
+    </div>
 
-    <!-- ── Personnage ────────────────────────────────────────── -->
-    <div class="section-header">Personnage</div>
-
-    <a class="card" href="char-builder.html">
-        <div class="card-icon">◈</div>
-        <div class="card-cat">Character</div>
-        <div class="card-name">Char Builder</div>
-        <div class="card-desc">Assemblage modulaire — body, outfits, hair, beard. Shaders par zone de couleur.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <a class="card" href="char-combined.html">
-        <div class="card-icon">◉</div>
-        <div class="card-cat">Character</div>
-        <div class="card-name">Char Combiné</div>
-        <div class="card-desc">Builder + aperçu plein corps côte à côte.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <a class="card" href="character-preview.html">
-        <div class="card-icon">◎</div>
-        <div class="card-cat">Character</div>
-        <div class="card-name">Char Preview</div>
-        <div class="card-desc">Aperçu du personnage assemblé avec toutes ses animations actives.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <a class="card" href="anim-inspect.html">
-        <div class="card-icon">▶</div>
-        <div class="card-cat">Animation</div>
-        <div class="card-name">Anim Inspector</div>
-        <div class="card-desc">Browse et preview de tous les clips d'animation (toutes librairies fusionnées).</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <!-- ── Environnement ─────────────────────────────────────── -->
-    <div class="section-header">Environnement</div>
-
-    <a class="card" href="asset-browser.html">
-        <div class="card-icon">❖</div>
-        <div class="card-cat">Assets</div>
-        <div class="card-name">Asset Browser</div>
-        <div class="card-desc">Tous les assets Quaternius — filtre par catégorie, recherche, preview 3D.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <a class="card" href="village-browser.html">
-        <div class="card-icon">⌂</div>
-        <div class="card-cat">Environnement</div>
-        <div class="card-name">Village Browser</div>
-        <div class="card-desc">Browse et preview de toutes les pièces Medieval Village MegaKit.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <a class="card" href="nature-browser.html">
-        <div class="card-icon">✦</div>
-        <div class="card-cat">Environnement</div>
-        <div class="card-name">Nature Browser</div>
-        <div class="card-desc">Arbres, rochers et végétation — browse et preview 3D.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
-    <!-- ── Test ──────────────────────────────────────────────── -->
-    <div class="section-header">Test</div>
-
-    <a class="card" href="soldier-test.html">
-        <div class="card-icon">◆</div>
-        <div class="card-cat">Test</div>
-        <div class="card-name">Soldier Test</div>
-        <div class="card-desc">Scène de test rapide — personnage et animations.</div>
-        <div class="card-cta">Ouvrir →</div>
-    </a>
-
+    <!-- Iframes persistantes (lazy-loaded au premier accès) -->
+    <iframe class="t-frame" id="frame-gameplay-test"     title="Gameplay Test"></iframe>
+    <iframe class="t-frame" id="frame-char-builder"      title="Char Builder"></iframe>
+    <iframe class="t-frame" id="frame-char-combined"     title="Char Combiné"></iframe>
+    <iframe class="t-frame" id="frame-character-preview" title="Char Preview"></iframe>
+    <iframe class="t-frame" id="frame-anim-inspect"      title="Anim Inspector"></iframe>
+    <iframe class="t-frame" id="frame-asset-browser"     title="Asset Browser"></iframe>
+    <iframe class="t-frame" id="frame-village-browser"   title="Village Browser"></iframe>
+    <iframe class="t-frame" id="frame-nature-browser"    title="Nature Browser"></iframe>
+    <iframe class="t-frame" id="frame-soldier-test"      title="Soldier Test"></iframe>
 </div>
 
-<div class="hotkeys">
-    Serveur local &nbsp;·&nbsp; npx serve . -p 3000 &nbsp;·&nbsp; Chrome / Firefox
-</div>
+<script>
+(function () {
+    'use strict';
+
+    let _active = '';
+
+    function switchTo(toolId) {
+        // Tout masquer
+        document.querySelectorAll('.t-frame').forEach(f => f.classList.remove('active'));
+        document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('home').classList.remove('active');
+        document.getElementById('shell-brand').classList.remove('active');
+
+        _active = toolId || '';
+
+        if (!toolId) {
+            document.getElementById('home').classList.add('active');
+            document.getElementById('shell-brand').classList.add('active');
+            document.title = 'Three.js Game Editor';
+            history.replaceState(null, '', location.pathname);
+            return;
+        }
+
+        // Activer l'onglet
+        const tab = document.querySelector(`.s-tab[data-tool="${toolId}"]`);
+        tab?.classList.add('active');
+
+        // Lazy load : setter le src seulement au premier accès
+        const frame = document.getElementById('frame-' + toolId);
+        if (frame && !frame._loaded) {
+            frame.src = toolId + '.html';
+            frame._loaded = true;
+        }
+        frame?.classList.add('active');
+
+        document.title = (tab?.textContent?.trim() || toolId) + ' — TGE';
+        history.replaceState(null, '', '#' + toolId);
+    }
+
+    // Onglets de la barre shell
+    document.querySelectorAll('.s-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTo(tab.dataset.tool));
+    });
+
+    // Logo = retour accueil
+    document.getElementById('shell-brand').addEventListener('click', () => switchTo(''));
+
+    // Cartes du hub
+    document.querySelectorAll('.hub-card[data-open]').forEach(card => {
+        card.addEventListener('click', () => switchTo(card.dataset.open));
+    });
+
+    // Messages depuis les iframes (postMessage de nav.js)
+    window.addEventListener('message', e => {
+        if (e.data?.type === 'tge-navigate') {
+            switchTo(e.data.to);
+        }
+    });
+
+    // Restaurer depuis le hash (#gameplay-test)
+    const hash = location.hash.slice(1);
+    switchTo(hash || '');
+})();
+</script>
 
 <script src="src/asset-check.js"></script>
 </body>
