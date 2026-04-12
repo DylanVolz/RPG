@@ -1,7 +1,7 @@
 {
-  "name": "dark-rpg-studio",
+  "name": "threejs-game-editor",
   "version": "1.0.0",
-  "description": "Dark RPG Studio — Three.js Quaternius",
+  "description": "Three.js Game Editor — Quaternius",
   "main": "server.js",
   "bin": "server.js",
   "scripts": {

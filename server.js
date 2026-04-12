@@ -1,7 +1,7 @@
 /**
- * Dark RPG Studio — serveur local
+ * Three.js Game Editor — serveur local
  * Lance avec :  node server.js
- * Compile en exe :  npx pkg server.js --target node18-win-x64 --output DarkRPG.exe
+ * Compile en exe :  npx pkg server.js --target node18-win-x64 --output Studio.exe
  */
 'use strict';
 
@@ -11,7 +11,7 @@ const path  = require('path');
 const { exec } = require('child_process');
 
 const PORT = 3000;
-process.title = 'Dark RPG — Studio';
+process.title = 'Three.js Game Editor';
 
 // Quand compilé avec pkg, process.execPath = chemin du .exe
 // Quand lancé avec node, __filename = chemin du script
@@ -84,7 +84,7 @@ server.listen(PORT, '127.0.0.1', () => {
     const url = `http://localhost:${PORT}`;
     console.log('');
     console.log('  ╔══════════════════════════════════╗');
-    console.log('  ║      DARK RPG — Studio           ║');
+    console.log('  ║    Three.js Game Editor          ║');
     console.log(`  ║  ${url}          ║`);
     console.log('  ╚══════════════════════════════════╝');
     console.log('');

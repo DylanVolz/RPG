@@ -23,7 +23,7 @@ export const LiveSync = {
             console.warn('[LiveSync] BroadcastChannel non supporté — live sync désactivé.');
             return;
         }
-        this._ch = new BroadcastChannel('darkrpg_studio');
+        this._ch = new BroadcastChannel('threejs_game_editor');
         this._ch.onmessage = ({ data }) => {
             const { type, payload } = data;
             (this._listeners[type] || []).forEach(fn => fn(payload));
