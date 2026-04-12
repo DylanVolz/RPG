@@ -656,7 +656,12 @@ async function loadCharacterFromConfig(cfg) {
         detachAllWeapons();
         scene.remove(charRoot);
         charRoot = null;
-        if (mixer) { mixer.stopAllActions(); mixer = null; activeAction = null; }
+    }
+    if (mixer) {
+        try { mixer.stopAllActions(); } catch(e) { console.warn('[GripEditor] stopAllActions:', e.message); }
+        try { mixer.uncacheRoot && mixer.uncacheRoot(charRoot); } catch {}
+        mixer = null;
+        activeAction = null;
     }
 
     try {
