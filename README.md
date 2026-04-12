@@ -1,4 +1,4 @@
-# Three.js Quaternius Studio
+# Three.js Game Editor
 
 > **Work in progress** — things may be incomplete, change without notice, or break unexpectedly.
 > Feedback, suggestions, and contributions are welcome — feel free to open an issue or start a discussion!
@@ -12,29 +12,26 @@ No build step, no bundler — runs entirely in the browser.
 
 ## Quick Start
 
-### Option A — Studio.exe (recommended)
+### Option A — Studio.exe (recommended, Windows only)
 
-A standalone launcher is available — **no Node.js or Python required** on the target machine.
+**No Node.js or Python required.**
 
-**1. Clone the repository**
+**1. [Download Studio.exe](https://github.com/ixtrem16-netizen/RPG/releases/latest)** from the Releases page and place it in the project folder (next to `assets/`, `src/`, etc.).
+
+**2. Clone or download the repository** (code + structure, without the assets)
 ```bash
 git clone https://github.com/ixtrem16-netizen/RPG.git
-cd RPG
 ```
 
-**2. Download the Quaternius assets** — see [Required Assets](#setup--required-assets) below.
-
-**3. Build the launcher** *(one-time, requires Node.js)*
-```bash
-npx pkg . --target node18-win-x64 --output Studio.exe --compress GZip
-```
+**3. Download the Quaternius assets** — see [Required Assets](#setup--required-assets) below and place them in `assets/`.
 
 **4. Launch**
 
-Double-click `Studio.exe` — the browser opens on the hub automatically.
+Double-click `Studio.exe` — the browser opens on `http://localhost:3000` automatically.
 
-> `Studio.exe` (~36 MB) embeds the Node.js runtime. It only needs to be rebuilt if `server.js` changes.
-> The `.exe` is excluded from the repository (`.gitignore`) — each developer builds their own copy.
+> `Studio.exe` embeds the Node.js runtime (~36 MB). It is not included in the repository — download it from the [Releases page](https://github.com/ixtrem16-netizen/RPG/releases/latest).
+>
+> **Developers:** to rebuild the exe after modifying `server.js`, run `npm run build` (requires Node.js).
 
 ---
 
@@ -113,9 +110,8 @@ Preview a fully assembled character with animations playing.
 ---
 
 ### `anim-inspect.html` — Animation Inspector
-Browse and preview all animation clips from UAL1 / UAL2.
+Browse and preview all animation clips (UAL1 + UAL2 merged into a single unified library).
 
-- Click **UAL 1** or **UAL 2** to switch library
 - Click any clip name to preview it on the character
 - Duration is shown under each clip name
 
