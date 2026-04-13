@@ -397,9 +397,12 @@ export class CharacterRenderer {
         bodyRoot.traverse(n => { if (n.isBone) boneMapBody[n.name] = n; });
 
         // Attacher body / hair / beard sur bodyRoot
-        const bodyMeshes = _attachMeshes(bodyGltf, boneMapBody, isHeadRelatedMesh, bodyRoot);
-        if (hairGltf)  _attachMeshes(hairGltf,  boneMapBody, () => true, bodyRoot);
-        if (beardGltf) _attachMeshes(beardGltf, boneMapBody, () => true, bodyRoot);
+        // On capture les listes pour appliquer les couleurs sans re-traverser :
+        // isFullBodyMesh() retourne true pour les cheveux aussi (même squelette complet),
+        // donc la distinction se fait uniquement par la source GLTF d'origine.
+        const bodyMeshes  = _attachMeshes(bodyGltf,  boneMapBody, isHeadRelatedMesh, bodyRoot);
+        const hairMeshes  = hairGltf  ? _attachMeshes(hairGltf,  boneMapBody, () => true, bodyRoot) : [];
+        const beardMeshes = beardGltf ? _attachMeshes(beardGltf, boneMapBody, () => true, bodyRoot) : [];
 
         // Injecter shaders après attachment
         bodyMeshes.forEach(m => {
@@ -412,39 +415,39 @@ export class CharacterRenderer {
         });
 
         // ── Appliquer les couleurs depuis la config ────────────────
-        // eyeColor — active le shader iris sur les yeux
+        // Helper inline
+        const _setColor = (meshes, color) => meshes.forEach(m =>
+            (Array.isArray(m.material) ? m.material : [m.material])
+                .forEach(mat => { if (mat) mat.color.set(color); }));
+
+        // eyeColor — active le shader iris (source : bodyMeshes, filtrés par nom)
         if (cfg.eyeColor) {
             const ec = new THREE.Color(cfg.eyeColor);
-            bodyRoot.traverse(n => {
-                if (!n.isMesh) return;
-                const nl = n.name.toLowerCase();
+            bodyMeshes.forEach(m => {
+                const nl = m.name.toLowerCase();
                 if (nl !== 'eyes' && !nl.includes('mi_eye')) return;
-                (Array.isArray(n.material) ? n.material : [n.material]).forEach(m => {
-                    const u = m?.userData?.eyeUniforms;
+                (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
+                    const u = mat?.userData?.eyeUniforms;
                     if (u) { u.uIrisColor.value.set(ec); u.uIrisEnabled.value = 1.0; }
                 });
             });
         }
 
-        // hairColor — teinte cheveux, barbe, sourcils
+        // hairColor — cheveux/barbe (listes trackées) + sourcils (bodyMeshes)
         if (cfg.hairColor) {
             const hc = new THREE.Color(cfg.hairColor);
-            bodyRoot.traverse(n => {
-                if (!n.isMesh || isFullBodyMesh(n)) return;
-                const nl = n.name.toLowerCase();
-                if (nl === 'eyes' || nl.includes('mi_eye')) return;
-                (Array.isArray(n.material) ? n.material : [n.material])
-                    .forEach(m => { if (m) m.color.set(hc); });
-            });
+            _setColor(hairMeshes,  hc);
+            _setColor(beardMeshes, hc);
+            _setColor(bodyMeshes.filter(m => m.name.toLowerCase() === 'eyebrows'), hc);
         }
 
-        // skinColor — teinte peau via shader uSkinColor/uSkinBlend
+        // skinColor — teinte peau via bodyZoneUniforms (injecté plus haut)
         if (cfg.skinColor) {
             const sc = new THREE.Color(cfg.skinColor);
-            bodyRoot.traverse(n => {
-                if (!n.isMesh || !isFullBodyMesh(n)) return;
-                (Array.isArray(n.material) ? n.material : [n.material]).forEach(m => {
-                    const u = m?.userData?.bodyZoneUniforms;
+            bodyMeshes.forEach(m => {
+                if (!isFullBodyMesh(m)) return;
+                (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
+                    const u = mat?.userData?.bodyZoneUniforms;
                     if (u) { u.uSkinColor.value.set(sc); u.uSkinBlend.value = 1.0; }
                 });
             });
