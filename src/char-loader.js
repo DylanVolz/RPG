@@ -21,12 +21,27 @@ export const UAL_PATHS = [
     'assets/characters/animations/UAL2_Source.glb',
 ];
 
-// ── Détection de mesh lié à la tête ─────────────────────────────────────────
-// Approche par os (indépendante du nom du mesh) — fonctionne avec tout pack Quaternius.
-// Un mesh "tête" possède neck_01 ou Head dans son squelette.
+// ── Détection de mesh par os du squelette ────────────────────────────────────
+// Approche indépendante du nom du mesh — fonctionne avec tout pack Quaternius.
+
+// Mesh "lié à la tête" : a neck_01 ou Head dans son squelette.
+// Inclut le mesh corps complet (qui a aussi spine) ET les yeux/sourcils.
+// → Utilisé par char-builder (dual-skeleton, pas de z-fighting).
 export function isHeadRelatedMesh(node) {
     return node.isSkinnedMesh &&
         node.skeleton?.bones.some(b => b.name === 'neck_01' || b.name === 'Head');
+}
+
+// Mesh "tête uniquement" : a neck_01/Head SANS spine.
+// Correspond aux meshes yeux, sourcils et tête seule (pas le body complet).
+// → Utilisé par les outils preview (grip-editor, character-preview) qui
+//   attachent body sur le skeleton outfit : exclut le mesh corps plein
+//   pour éviter le z-fighting outfit/skin.
+export function isHeadOnlyMesh(node) {
+    if (!node.isSkinnedMesh || !node.skeleton) return false;
+    const bones = new Set(node.skeleton.bones.map(b => b.name));
+    return (bones.has('neck_01') || bones.has('Head')) &&
+           !bones.has('spine_01') && !bones.has('spine_02') && !bones.has('spine_03');
 }
 
 // ── Attacher des SkinnedMesh d'un GLTF sur un squelette cible ───────────────

@@ -122,7 +122,7 @@ import { GLTFLoader }  from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { resolveCharConfig, getAllCharConfigs } from './src/char-config.js';
-import { UAL_PATHS, isHeadRelatedMesh, attachSkinned } from './src/char-loader.js';
+import { UAL_PATHS, isHeadOnlyMesh, attachSkinned } from './src/char-loader.js';
 
 // ── Scène ────────────────────────────────────────────────────────
 const vp = document.getElementById('vp');
@@ -252,8 +252,9 @@ async function loadChar(cfg) {
                 .forEach(m => { if (m) m.side = THREE.DoubleSide; });
         });
 
-        // useFallback=true : bones twist du body absents de l'outfit → Hips fallback
-        if (bodyGltf)  attachSkinned(bodyGltf,  charRoot, isHeadRelatedMesh, true);
+        // isHeadOnlyMesh : yeux/sourcils/tête uniquement, PAS le mesh corps plein
+        // (évite le z-fighting outfit/skin sur les zones couvertes)
+        if (bodyGltf)  attachSkinned(bodyGltf,  charRoot, isHeadOnlyMesh, true);
         if (hairGltf)  attachSkinned(hairGltf,  charRoot, null, true);
         if (beardGltf) attachSkinned(beardGltf, charRoot, null, true);
 
