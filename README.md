@@ -49,6 +49,24 @@ Then open **http://localhost:3000** in Chrome or Firefox.
 
 ---
 
+### Option C — Bundled server with external assets
+
+```bash
+node server.js                                  # bundled ./assets/
+node server.js --assets-root /path/to/assets    # external asset tree
+TOOLS_WEB_ASSETS_ROOT=/path/to/assets node server.js
+```
+
+The `/assets/*` URL root resolves against whichever path is supplied; everything
+else (HTML pages, `src/*`) is served from the directory that contains
+`server.js`. Useful when embedding these tools in a larger project that owns
+its own asset tree — the tools see `/assets/<pack>/<file>.glb` regardless of
+where those assets live on disk.
+
+Priority: `--assets-root` > `TOOLS_WEB_ASSETS_ROOT` > bundled `./assets/`.
+
+---
+
 ## Navigation
 
 Every tool page has a **`≡` button** (bottom-right corner) that opens a quick-switch menu to jump between tools without going back to the hub.
