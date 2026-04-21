@@ -29,6 +29,7 @@
     // ── Accès direct : bouton ≡ flottant ─────────────────────────────────────
     const TOOLS = [
         { label: 'Accueil',         id: '',                  icon: '⌂',  cat: null },
+        { label: 'Task Viewer',     id: 'task-viewer',       icon: '✓',  cat: 'Planning' },
         { label: 'Gameplay Test',   id: 'gameplay-test',     icon: '⚔',  cat: 'Gameplay' },
         { label: 'Char Builder',    id: 'char-builder',      icon: '◈',  cat: 'Personnage' },
 { label: 'Char Preview',    id: 'character-preview', icon: '◎',  cat: null },

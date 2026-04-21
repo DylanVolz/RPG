@@ -12,9 +12,10 @@
  */
 'use strict';
 
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http  = require('http');
+const fs    = require('fs');
+const path  = require('path');
+const { spawn } = require('child_process');
 
 // Port 3000 is taken by Grafana in this repo's Docker compose, and Docker's
 // forwarder catches requests before this Node process even binds. Pick an
@@ -96,6 +97,120 @@ if (manifestRootArg) {
 }
 const MANIFEST_URL_PREFIX = '/manifest/';
 
+// --- Task API sidecar (Python) ---------------------------------------------
+// The Task Viewer page hits /api/tasks/* which this server proxies to a local
+// Python HTTP server (tools/task_api_server.py in the main game repo). The
+// sidecar is spawned as a child of this Node process and reaped on exit.
+//
+// Config resolution:
+//   --task-api-port <n>    / TOOLS_WEB_TASK_API_PORT    (default 47824)
+//   --task-api-script <p>  / TOOLS_WEB_TASK_API_SCRIPT  (default: derived from ASSETS_ROOT)
+//   --no-task-api                                         disable the sidecar entirely
+let TASK_API_PORT = 47824;
+let TASK_API_DISABLED = false;
+let taskApiScriptArg = null;
+for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === '--task-api-port' && process.argv[i + 1]) {
+        TASK_API_PORT = parseInt(process.argv[i + 1], 10);
+    }
+    if (process.argv[i] === '--task-api-script' && process.argv[i + 1]) {
+        taskApiScriptArg = process.argv[i + 1];
+    }
+    if (process.argv[i] === '--no-task-api') TASK_API_DISABLED = true;
+}
+if (process.env.TOOLS_WEB_TASK_API_PORT) {
+    const n = parseInt(process.env.TOOLS_WEB_TASK_API_PORT, 10);
+    if (Number.isFinite(n)) TASK_API_PORT = n;
+}
+if (!taskApiScriptArg && process.env.TOOLS_WEB_TASK_API_SCRIPT) {
+    taskApiScriptArg = process.env.TOOLS_WEB_TASK_API_SCRIPT;
+}
+let TASK_API_SCRIPT;
+if (taskApiScriptArg) {
+    TASK_API_SCRIPT = path.resolve(process.cwd(), taskApiScriptArg);
+} else {
+    // Default: assume repo layout — ASSETS_ROOT is <repo>/client/game/assets,
+    // task_api_server.py is <repo>/tools/task_api_server.py.
+    TASK_API_SCRIPT = path.resolve(ASSETS_ROOT, '..', '..', '..', 'tools', 'task_api_server.py');
+}
+const TASK_API_URL_PREFIX = '/api/';
+
+let taskApiChild = null;
+let shuttingDown = false;
+let taskApiRestartTimer = null;
+
+function startTaskApi() {
+    if (TASK_API_DISABLED) return;
+    if (!fs.existsSync(TASK_API_SCRIPT)) {
+        console.error(`  [task-api] script not found: ${TASK_API_SCRIPT} (disable with --no-task-api)`);
+        return;
+    }
+    taskApiChild = spawn('python3', [
+        TASK_API_SCRIPT,
+        '--port', String(TASK_API_PORT),
+    ], { stdio: ['ignore', 'inherit', 'inherit'] });
+    taskApiChild.on('exit', (code, signal) => {
+        console.error(`  [task-api] child exited code=${code} signal=${signal}`);
+        taskApiChild = null;
+        if (!shuttingDown) {
+            // Backoff 1s, then retry. Prevents tight loops on broken scripts.
+            taskApiRestartTimer = setTimeout(() => {
+                console.error('  [task-api] restarting...');
+                startTaskApi();
+            }, 1000);
+        }
+    });
+    taskApiChild.on('error', (err) => {
+        console.error(`  [task-api] spawn error: ${err.message}`);
+    });
+}
+
+function proxyTaskApi(req, res) {
+    if (TASK_API_DISABLED || !taskApiChild) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'task-api sidecar not running' }));
+        return;
+    }
+    const opts = {
+        host:    '127.0.0.1',
+        port:    TASK_API_PORT,
+        path:    req.url,
+        method:  req.method,
+        headers: req.headers,
+    };
+    const proxyReq = http.request(opts, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+    });
+    proxyReq.on('error', (err) => {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'task-api proxy failed: ' + err.message }));
+    });
+    req.pipe(proxyReq);
+}
+
+function shutdownTaskApi(cb) {
+    shuttingDown = true;
+    if (taskApiRestartTimer) clearTimeout(taskApiRestartTimer);
+    if (!taskApiChild) { if (cb) cb(); return; }
+    const child = taskApiChild;
+    try { child.kill('SIGTERM'); } catch (_) {}
+    // Wait up to 2s for graceful exit, then SIGKILL + exit.
+    const hardTimer = setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch (_) {}
+        if (cb) cb();
+    }, 2000);
+    child.once('exit', () => { clearTimeout(hardTimer); if (cb) cb(); });
+}
+function gracefulExit(code) {
+    shutdownTaskApi(() => process.exit(code));
+}
+process.on('SIGINT',  () => gracefulExit(0));
+process.on('SIGTERM', () => gracefulExit(0));
+// Last-resort synchronous kill (process.on('exit') can't await async work,
+// but sending a signal is synchronous + cheap).
+process.on('exit', () => { if (taskApiChild) { try { taskApiChild.kill('SIGKILL'); } catch (_) {} } });
+
 const MIME = {
     '.html': 'text/html; charset=utf-8',
     '.js'  : 'application/javascript; charset=utf-8',
@@ -130,6 +245,12 @@ function resolveRoot(reqPath) {
 const server = http.createServer((req, res) => {
     // Decode URL and ignore query strings.
     let reqPath = decodeURIComponent(req.url.split('?')[0]);
+
+    // Task API proxy: /api/* → Python sidecar. Must check BEFORE file resolution
+    // so the /api/ namespace doesn't fall through to disk lookup.
+    if (reqPath.startsWith(TASK_API_URL_PREFIX)) {
+        return proxyTaskApi(req, res);
+    }
 
     const { root, rel } = resolveRoot(reqPath);
 
@@ -186,9 +307,15 @@ server.listen(PORT, '127.0.0.1', () => {
     console.log(`  tools root    : ${TOOLS_ROOT}`);
     console.log(`  assets root   : ${ASSETS_ROOT}  [from: ${assetsRootSource}]`);
     console.log(`  manifest root : ${MANIFEST_ROOT}  [from: ${manifestRootSource}]`);
+    if (TASK_API_DISABLED) {
+        console.log(`  task api      : disabled (--no-task-api)`);
+    } else {
+        console.log(`  task api      : 127.0.0.1:${TASK_API_PORT}  [script: ${TASK_API_SCRIPT}]`);
+    }
     console.log('');
     console.log('  Ctrl+C to stop the server.');
     console.log('');
+    startTaskApi();
 });
 
 server.on('error', err => {

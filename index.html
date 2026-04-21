@@ -133,6 +133,7 @@ html, body { height:100vh; overflow:hidden; background:#070503; font-family:'Geo
 <div id="shell-bar">
     <div id="shell-brand" title="Accueil">TGE</div>
     <div id="shell-tabs">
+        <div class="s-tab primary" data-tool="task-viewer"><span class="s-icon">✓</span>Tasks</div>
         <div class="s-tab primary" data-tool="gameplay-test"><span class="s-icon">⚔</span>Gameplay</div>
         <div class="s-tab" data-tool="char-builder"><span class="s-icon">◈</span>Char Builder</div>
 <div class="s-tab" data-tool="character-preview"><span class="s-icon">◎</span>Char Preview</div>
@@ -167,6 +168,15 @@ html, body { height:100vh; overflow:hidden; background:#070503; font-family:'Geo
         <div class="ornament">✦ &nbsp;&nbsp; ✦ &nbsp;&nbsp; ✦</div>
 
         <div class="hub-grid">
+            <div class="hub-section">Planning</div>
+            <div class="hub-card primary" data-open="task-viewer" style="grid-column:span 3">
+                <div class="hub-icon">✓</div>
+                <div class="hub-cat">KG</div>
+                <div class="hub-name">Task Viewer</div>
+                <div class="hub-desc">633-task swimlane DAG over the MemPalace knowledge graph. Filter by room / type / status / cluster, inspect triples, claim / complete / block, edit dependencies.</div>
+                <div class="hub-cta">Ouvrir →</div>
+            </div>
+
             <div class="hub-section">Gameplay</div>
             <div class="hub-card primary" data-open="gameplay-test" style="grid-column:span 3">
                 <div class="hub-icon">⚔</div>
@@ -324,6 +334,7 @@ html, body { height:100vh; overflow:hidden; background:#070503; font-family:'Geo
     </div>
 
     <!-- Iframes persistantes (lazy-loaded au premier accès) -->
+    <iframe class="t-frame" id="frame-task-viewer"       title="Task Viewer"></iframe>
     <iframe class="t-frame" id="frame-gameplay-test"     title="Gameplay Test"></iframe>
     <iframe class="t-frame" id="frame-char-builder"      title="Char Builder"></iframe>
 <iframe class="t-frame" id="frame-character-preview" title="Char Preview"></iframe>
