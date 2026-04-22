@@ -12,6 +12,14 @@
  * modern laptop. Cycles are tolerated (dagre handles them with back-edges).
  */
 
+// Register the dagre layout plugin with cytoscape. The UMD bundle of
+// cytoscape-dagre used to auto-register on load but newer versions require
+// an explicit cytoscape.use() call. Safe to call unconditionally —
+// cytoscape.use() is idempotent on already-registered extensions.
+if (typeof window !== 'undefined' && window.cytoscape && window.cytoscapeDagre) {
+    try { window.cytoscape.use(window.cytoscapeDagre); } catch (e) { /* already registered */ }
+}
+
 const DONE_STATUSES = new Set([
     'completed', 'completed-by-ai', 'deprecated', 'superseded', 'skipped',
 ]);
@@ -76,32 +84,46 @@ export function createTaskGraph(container, opts = {}) {
     }
 
     function runLayout() {
-        cy.layout({
-            name: 'dagre',
-            rankDir: 'LR',      // left to right
-            rankSep: 80,        // column gap
-            nodeSep: 24,        // intra-rank gap
-            edgeSep: 12,
-            animate: false,
-            fit: true,
-            padding: 40,
-            // Dagre handles cycles by introducing dummy nodes / reversed edges.
-        }).run();
+        try {
+            cy.layout({
+                name: 'dagre',
+                rankDir: 'LR',      // left to right
+                rankSep: 80,        // column gap
+                nodeSep: 24,        // intra-rank gap
+                edgeSep: 12,
+                animate: false,
+                fit: true,
+                padding: 40,
+                // Dagre handles cycles by introducing dummy nodes / reversed edges.
+            }).run();
+        } catch (e) {
+            console.error('[task-graph] dagre layout threw, falling back to breadthfirst:', e);
+            try {
+                cy.layout({ name: 'breadthfirst', directed: true, padding: 40 }).run();
+            } catch (e2) {
+                console.error('[task-graph] breadthfirst also failed, using grid:', e2);
+                cy.layout({ name: 'grid', padding: 40 }).run();
+            }
+        }
     }
 
-    function applyFilter(predicate) {
-        // predicate(task) → boolean. Non-matching nodes dimmed, matching opaque.
+    function applyFilter(matchPred, hidePred) {
         cy.batch(() => {
             cy.nodes('[?task]').forEach(n => {
                 const t = currentTasks[n.id()];
-                const match = t ? predicate(t) : false;
-                n.toggleClass('dim', !match);
+                const hide  = t && hidePred ? hidePred(t) : false;
+                const match = t ? matchPred(t) : false;
+                n.toggleClass('hidden', hide);
+                n.toggleClass('dim', !hide && !match);
             });
-            // Dim edges whose endpoints are both dimmed.
             cy.edges().forEach(e => {
                 const s = currentTasks[e.source().id()];
                 const t = currentTasks[e.target().id()];
-                const bothDim = s && t && !predicate(s) && !predicate(t);
+                const srcHidden = s && hidePred && hidePred(s);
+                const tgtHidden = t && hidePred && hidePred(t);
+                const bothHidden = srcHidden && tgtHidden;
+                const bothDim = s && t && !matchPred(s) && !matchPred(t) && !bothHidden;
+                e.toggleClass('hidden', bothHidden);
                 e.toggleClass('dim', bothDim);
             });
         });
@@ -181,6 +203,8 @@ function buildElements(tasksById) {
         const room = t.room || '(unassigned)';
         const done = DONE_STATUSES.has(t.status);
         const shape = SHAPE_BY_TYPE[t.type] || 'round-rectangle';
+        const isWalkType   = t.type === 'walkthrough';
+        const isWalkVerify = t.verifiable_by === 'walkthrough';
         nodes.push({
             data: {
                 id:       tid,
@@ -197,28 +221,41 @@ function buildElements(tasksById) {
                 fill:     STATUS_COLOR[t.status] || '#6b7076',
                 shape,
                 done,
+                walkType:   isWalkType,
+                walkVerify: isWalkVerify,
             },
             classes: [
                 t.status,
                 done ? 'done' : '',
                 t.is_mvp ? 'mvp' : '',
                 t.priority ? ('prio-' + String(t.priority).toLowerCase()) : '',
+                isWalkType   ? 'walk-type'   : '',
+                isWalkVerify ? 'walk-verify' : '',
             ].filter(Boolean).join(' '),
         });
     }
 
+    let droppedEdges = 0;
     for (const [tid, t] of Object.entries(tasksById)) {
         for (const dep of (t.depends || [])) {
-            // Source depends_on target → arrow FROM source TO target.
+            // Skip edges whose target isn't in the rendered task set —
+            // Cytoscape throws "Cannot set properties of undefined" on
+            // orphan edges. Dep targets can be non-T-ID entities (ADRs,
+            // external refs) or tasks whose has_status triple has been
+            // fully invalidated.
+            if (!tasksById[dep]) { droppedEdges++; continue; }
             edges.push({
                 data: {
                     id:     `${tid}->${dep}`,
                     source: tid,
                     target: dep,
-                    depDone: DONE_STATUSES.has((tasksById[dep] || {}).status),
+                    depDone: DONE_STATUSES.has(tasksById[dep].status),
                 },
             });
         }
+    }
+    if (droppedEdges > 0) {
+        console.warn(`[task-graph] dropped ${droppedEdges} edges to unknown targets`);
     }
 
     return [...nodes, ...edges];
@@ -275,6 +312,25 @@ function graphStyle() {
             selector: 'node[?task].mvp',
             style: { 'border-color': '#d4a84b', 'border-width': 2 },
         },
+        // Walkthrough type: teal outer ring + larger-than-usual so shape reads.
+        {
+            selector: 'node[?task].walk-type',
+            style: {
+                'border-color':  '#7ccfd4',
+                'border-width':   3,
+                'overlay-color': '#7ccfd4', 'overlay-opacity': 0.08,
+            },
+        },
+        // verifiable_by=walkthrough (but not itself a walkthrough task):
+        // a subtle dashed teal border — says "testing story uses a walkthrough".
+        {
+            selector: 'node[?task].walk-verify:not(.walk-type)',
+            style: {
+                'border-color':  'rgba(124, 207, 212, 0.6)',
+                'border-width':   2,
+                'border-style':   'dashed',
+            },
+        },
         {
             selector: 'node[?task].selected',
             style: {
@@ -305,8 +361,9 @@ function graphStyle() {
             style: { 'line-color': '#ffd76e', 'target-arrow-color': '#ffd76e', 'width': 2 },
         },
 
-        // Filter dim.
-        { selector: 'node.dim, edge.dim', style: { 'opacity': 0.15 } },
+        // Filter dim + full hide.
+        { selector: 'node.dim, edge.dim',       style: { 'opacity': 0.15 } },
+        { selector: 'node.hidden, edge.hidden', style: { 'display': 'none' } },
 
         // Dep-add mode markers.
         {

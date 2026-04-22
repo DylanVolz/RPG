@@ -75,13 +75,153 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  #graph {
+  #graph, #lanes {
     grid-area: graph;
     background: var(--bg);
     position: relative;
-    overflow: hidden;
   }
+  #graph { overflow: hidden; }
   #graph-host { position: absolute; inset: 0; }
+  /* Lanes: one grid for the whole view — columns = global dep-rank, so a
+     dependent task in room B always sits to the right of the task it depends
+     on in room A. Overflow scrolls both axes. */
+  #lanes {
+    display: none; overflow: auto;
+    --tile-w: 180px;
+    --tile-h: 74px;
+    --tile-gap: 6px;
+    --lane-header-w: 150px;
+  }
+  #lanes.active { display: block; }
+  #graph.hidden { display: none; }
+
+  #lanes-grid {
+    display: grid;
+    /* columns = sticky header column + N rank columns, injected at render */
+    grid-auto-rows: min-content;
+    gap: var(--tile-gap);
+    padding: 10px;
+    align-items: start;
+  }
+  .lane-header {
+    grid-column: 1;
+    position: sticky; left: 10px; z-index: 2;
+    background: var(--bg); padding: 6px 8px;
+    border-left: 2px solid var(--accent);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--fg); font-weight: bold;
+    height: var(--tile-h); display: flex; flex-direction: column; justify-content: center;
+  }
+  .lane-header .lane-count {
+    display: block; color: var(--fg-dim); font-size: 9px;
+    letter-spacing: 1px; margin-top: 3px; font-weight: normal;
+    text-transform: none;
+  }
+  .rank-ruler {
+    grid-row: 1; /* sit on top of the grid, before any lane header */
+    position: sticky; top: 0; z-index: 3;
+    background: var(--bg);
+    font-size: 9px; color: var(--fg-dim); letter-spacing: 1px;
+    text-align: center;
+    padding: 4px 0; border-bottom: 1px solid var(--border);
+  }
+  .rank-ruler.rr-header {
+    grid-column: 1; grid-row: 1;
+    left: 10px; z-index: 4;  /* corner cell sticks both axes */
+  }
+
+  /* Task tile — bigger, multi-line, grid-placed by rank. */
+  .task-pill {
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 6px 8px; border: 1px solid rgba(255,255,255,0.15);
+    background: var(--bg-elev); color: var(--fg);
+    font-size: 11px; font-family: -apple-system, 'Segoe UI', sans-serif;
+    cursor: pointer; transition: border-color 120ms, opacity 120ms, transform 120ms;
+    min-width: 0; overflow: hidden;
+    height: var(--tile-h);
+    width: var(--tile-w);
+    box-sizing: border-box;
+  }
+  .task-pill:hover { border-color: var(--border-strong); color: var(--accent); transform: translateY(-1px); }
+  .task-pill.selected {
+    border-color: #ffd76e; background: rgba(212,168,75,0.12); color: #ffd76e;
+    box-shadow: 0 0 0 2px rgba(212,168,75,0.3);
+  }
+  .task-pill.dim { opacity: 0.15; pointer-events: none; }
+  .task-pill.hidden { display: none !important; }
+  .task-pill.mvp { border-color: var(--accent); }
+  .task-pill.done { opacity: 0.55; }
+  .task-pill.ready-marker { border-left: 3px solid #5c9c54; }
+
+  .task-pill .pill-row1 {
+    display: flex; align-items: center; gap: 5px; min-width: 0;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .task-pill .pill-row1 .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .task-pill .pill-row1 .tid { font-weight: bold; font-size: 11px; }
+  .task-pill .pill-row1 .typ {
+    margin-left: auto; font-size: 9px; color: var(--fg-dim);
+    letter-spacing: 1px; text-transform: uppercase; flex-shrink: 0;
+  }
+  .task-pill .pill-title {
+    font-size: 11px; line-height: 1.25; color: var(--fg);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    flex: 1 1 auto; margin: 2px 0;
+  }
+  .task-pill .pill-meta {
+    display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
+    font-size: 9px; color: var(--fg-dim); letter-spacing: 0.5px;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    min-height: 12px;
+  }
+  .task-pill .pill-meta .chip {
+    padding: 0 4px; border: 1px solid rgba(200,184,154,0.18);
+    border-radius: 2px; font-size: 9px; color: var(--fg-dim);
+  }
+  .task-pill .pill-meta .chip.ready { color: #5c9c54; border-color: rgba(92,156,84,0.45); }
+  .task-pill .pill-meta .chip.mvp   { color: var(--accent); border-color: rgba(212,168,75,0.45); }
+  .task-pill .pill-meta .chip.boost { color: #ff7a3d; border-color: rgba(255,122,61,0.55); font-weight: bold; }
+  .task-pill .pill-meta .chip.urgent { color: #ff3d3d; border-color: rgba(255,61,61,0.7); font-weight: bold; background: rgba(255,61,61,0.12); }
+  .task-pill .pill-meta .chip.high   { color: #ff9040; border-color: rgba(255,144,64,0.55); font-weight: bold; }
+  .task-pill .pill-meta .chip.medium { color: #d4a84b; border-color: rgba(212,168,75,0.45); }
+  .task-pill .pill-meta .chip.ea    { color: #d4a84b; border-color: rgba(212,168,75,0.35); }
+  .task-pill.done .pill-title { text-decoration: line-through; opacity: 0.6; }
+  /* Cross-lane dep ghost: marker in the DOWNSTREAM lane at the column of an
+     UPSTREAM task. data-tid points at the upstream so clicks flow through the
+     existing onPillTap → selectTask path. */
+  .task-pill.ghost {
+    background: transparent;
+    border: 1px dashed rgba(124, 207, 212, 0.55);
+    color: var(--fg-dim);
+    opacity: 0.75;
+  }
+  .task-pill.ghost:hover {
+    opacity: 1;
+    border-color: #7ccfd4;
+    color: #7ccfd4;
+    transform: translateY(-1px);
+  }
+  .task-pill.ghost .pill-row1 .tid { color: inherit; }
+  .task-pill.ghost .pill-title {
+    color: var(--fg-dim); font-style: italic; font-size: 10px;
+    -webkit-line-clamp: 1;
+  }
+  .task-pill.ghost .ghost-arrow {
+    color: #7ccfd4; font-weight: bold; font-size: 12px; margin-right: 2px;
+  }
+
+  /* Walkthrough flags — teal accent, doesn't steal the status color. */
+  .task-pill.walk-type { box-shadow: inset 3px 0 0 #7ccfd4; padding-left: 11px; }
+  .task-pill .wt-badge {
+    color: #7ccfd4; font-size: 9px; font-weight: bold; margin-right: 2px; flex-shrink: 0;
+  }
+  .task-pill .wv-badge {
+    color: rgba(124, 207, 212, 0.55); font-size: 10px; margin-left: auto; flex-shrink: 0;
+  }
+  .task-pill.walk-type .wv-badge { display: none; }
 
   /* Mode banner (top of graph) when user is in "add dep" or "remove dep" mode. */
   #mode-banner {
@@ -163,32 +303,41 @@
 <div id="app">
   <div id="filters">
     <label>type</label>
-    <select id="f-type" multiple size="1">
-      <option value="" selected>all</option>
-    </select>
+    <select id="f-type"><option value="">all</option></select>
 
     <label>status</label>
-    <select id="f-status" multiple size="1">
-      <option value="" selected>all</option>
-    </select>
+    <select id="f-status"><option value="">all</option></select>
 
     <label>room</label>
-    <select id="f-room">
-      <option value="">all</option>
-    </select>
+    <select id="f-room"><option value="">all</option></select>
 
     <label>cluster</label>
-    <select id="f-cluster">
-      <option value="">all</option>
-    </select>
+    <select id="f-cluster"><option value="">all</option></select>
 
+    <label title="hide completed / deprecated / superseded / skipped — done work"><input type="checkbox" id="f-hide-done" checked/> hide done</label>
     <label><input type="checkbox" id="f-mvp"/> mvp only</label>
     <label><input type="checkbox" id="f-ready"/> ready only</label>
+    <label title="type=walkthrough OR verifiable_by=walkthrough"><input type="checkbox" id="f-walk"/> walkthrough</label>
+    <label title="show cross-lane dep markers in downstream lanes"><input type="checkbox" id="f-ghosts" checked/> cross-lane ghosts</label>
 
     <input type="text" id="f-search" placeholder="search title / id..."/>
 
     <button id="btn-refresh" title="re-fetch from API (Ctrl-R)">reload</button>
+    <label title="auto-refresh every 10s — useful while synthesis is running">
+        <input type="checkbox" id="f-autorefresh"/> auto-refresh
+    </label>
+    <span id="autorefresh-indicator" style="color:var(--fg-dim); font-size:10px; display:none;">· <span id="autorefresh-last">—</span></span>
     <button id="btn-fit" title="fit graph to viewport">fit</button>
+
+    <span style="margin-left:8px; color:var(--fg-dim);">view</span>
+    <button id="btn-view-graph" title="swimlane DAG">graph</button>
+    <button id="btn-view-lanes" class="active" title="horizontal lanes table">lanes</button>
+
+    <span class="tile-size-ctl" style="margin-left:8px; color:var(--fg-dim); display:flex; align-items:center; gap:4px;">
+      tile
+      <input type="range" id="f-tile-w" min="120" max="320" step="10" value="180" title="tile width" style="width:60px;">
+      <input type="range" id="f-tile-h" min="48"  max="140" step="4"  value="74"  title="tile height" style="width:60px;">
+    </span>
 
     <span id="status-badge">loading…</span>
   </div>
@@ -201,6 +350,8 @@
     </div>
     <div id="empty">No tasks match the current filters.</div>
   </div>
+
+  <div id="lanes"><div id="lanes-grid"></div></div>
 
   <div id="details">
     <p style="color: var(--fg-dim); font-style: italic;">

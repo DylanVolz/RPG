@@ -226,6 +226,9 @@ const MIME = {
     '.mp3' : 'audio/mpeg',
     '.ogg' : 'audio/ogg',
     '.wav' : 'audio/wav',
+    '.m4a' : 'audio/mp4',
+    '.flac': 'audio/flac',
+    '.pdf' : 'application/pdf',
     '.svg' : 'image/svg+xml',
     '.ico' : 'image/x-icon',
 };

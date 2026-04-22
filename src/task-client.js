@@ -62,6 +62,10 @@ export const setTriple = (id, predicate, object, opts = {}) =>
         invalidate_current: opts.invalidateCurrent !== false,
     });
 
+// Priority scale: urgent=100, high=75, medium=50, low=clear (no triple, no badge)
+export const setPriority = (id, level) =>
+    _req('POST', `/api/tasks/${encodeURIComponent(id)}/priority`, { level });
+
 // ── Derived helpers (client-side) ──────────────────────────────────
 
 /**

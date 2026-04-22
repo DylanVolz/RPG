@@ -115,6 +115,15 @@ export class TaskPanel {
         const room  = firstObj(cur.belongs_to) || '';
         const cluster = firstObj(cur.feature_cluster) || '';
 
+        // Priority: derive level from priority_boost triple.
+        // urgent=100, high=75, medium=50, low=unset (no triple, no badge).
+        const boostObj = firstObj(cur.priority_boost);
+        const boostVal = boostObj ? parseInt(boostObj, 10) || 0 : 0;
+        let currentPriorityLevel = 'low';
+        if (boostVal >= 100)      currentPriorityLevel = 'urgent';
+        else if (boostVal >= 75)  currentPriorityLevel = 'high';
+        else if (boostVal >= 50)  currentPriorityLevel = 'medium';
+
         const deps = (cur.depends_on || []).map(x => x.object);
         const incomingDeps = (detail.incoming || []).filter(r => r.predicate === 'depends_on');
         const otherIncoming = (detail.incoming || []).filter(r => r.predicate !== 'depends_on');
@@ -187,6 +196,19 @@ export class TaskPanel {
             </section>
 
             <section>
+                <h3>Priority <span style="color:#8a7e68;">(current: ${esc(currentPriorityLevel)})</span></h3>
+                <div class="actions" data-priority-scale="1">
+                    <button data-priority="urgent" class="${currentPriorityLevel==='urgent'?'active':''}"
+                            style="${currentPriorityLevel==='urgent'?'background:#cc4c4c;color:#fff;border-color:#cc4c4c;':'color:#ff7a7a;border-color:rgba(204,76,76,0.55);'}">URGENT</button>
+                    <button data-priority="high" class="${currentPriorityLevel==='high'?'active':''}"
+                            style="${currentPriorityLevel==='high'?'background:#d4772c;color:#fff;border-color:#d4772c;':'color:#ff9040;border-color:rgba(255,144,64,0.45);'}">high</button>
+                    <button data-priority="medium" class="${currentPriorityLevel==='medium'?'active':''}"
+                            style="${currentPriorityLevel==='medium'?'background:#a8842c;color:#fff;border-color:#a8842c;':'color:#d4a84b;border-color:rgba(212,168,75,0.35);'}">medium</button>
+                    <button data-priority="low" class="${currentPriorityLevel==='low'?'active':''}">low (clear)</button>
+                </div>
+            </section>
+
+            <section>
                 <h3>Dependencies <span style="color:#8a7e68;">(this needs…)</span></h3>
                 <div>${depChips}</div>
                 <div class="actions" style="margin-top:6px;">
@@ -238,6 +260,14 @@ export class TaskPanel {
                 if (this.cb.onEnterAddDepMode) this.cb.onEnterAddDepMode(detail.id);
             });
         }
+        this.container.querySelectorAll('[data-priority]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const level = btn.getAttribute('data-priority');
+                if (this.cb.onPriorityChange) {
+                    this.cb.onPriorityChange(detail.id, level);
+                }
+            });
+        });
     }
 
     _onTransition(toStatus, needsReason) {
