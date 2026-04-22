@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Audio — Browser</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+       display:flex; height:100vh; overflow:hidden; }
+
+#sidebar {
+    width:320px; flex-shrink:0; background:#0a0c0e;
+    border-right:1px solid rgba(200,184,154,0.1);
+    display:flex; flex-direction:column; overflow:hidden;
+}
+#search {
+    background:rgba(200,184,154,0.06); border:none;
+    border-bottom:1px solid rgba(200,184,154,0.1);
+    color:#c8b89a; padding:12px 14px; font-family:'Georgia',serif;
+    font-size:11px; letter-spacing:1px; outline:none; width:100%;
+}
+#search::placeholder { color:rgba(200,184,154,0.25); }
+.picker-row {
+    display:flex; flex-wrap:wrap; gap:4px; padding:8px 8px 6px;
+    border-bottom:1px solid rgba(200,184,154,0.08);
+}
+.picker-row .label {
+    width:100%; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+    color:rgba(200,184,154,0.4); margin-bottom:2px;
+}
+.pill {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.5); padding:3px 8px; font-size:9px;
+    letter-spacing:1px; cursor:pointer; transition:all 0.1s; text-transform:uppercase;
+}
+.pill:hover, .pill.active {
+    background:rgba(200,184,154,0.15); color:#c8b89a; border-color:rgba(200,184,154,0.4);
+}
+.pill .muted { color:rgba(200,184,154,0.3); margin-left:4px; }
+
+#list { overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:#2a2418 transparent; }
+.item {
+    padding:7px 14px; font-size:10px; letter-spacing:0.3px;
+    cursor:pointer; border-bottom:1px solid rgba(200,184,154,0.04);
+    transition:background 0.1s; display:flex; gap:8px; align-items:center;
+}
+.item .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.item .meta { font-size:9px; color:rgba(200,184,154,0.3); flex-shrink:0; font-variant-numeric:tabular-nums; }
+.item:hover  { background:rgba(200,184,154,0.08); }
+.item.active { background:rgba(200,184,154,0.18); color:#fff; }
+.item.active .meta { color:rgba(255,255,255,0.5); }
+.item .pack-tag { font-size:8px; color:rgba(200,184,154,0.35); flex-shrink:0; }
+#count { padding:8px 14px; font-size:9px; letter-spacing:2px; color:rgba(200,184,154,0.25); border-top:1px solid rgba(200,184,154,0.08); }
+
+#main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+#now-playing {
+    padding:18px 24px; border-bottom:1px solid rgba(200,184,154,0.08);
+    min-height:120px; display:flex; flex-direction:column; gap:8px;
+}
+#np-name {
+    font-size:13px; letter-spacing:2px; text-transform:uppercase; color:#e8d8b0;
+}
+#np-sub {
+    font-size:10px; letter-spacing:1px; color:rgba(200,184,154,0.5);
+}
+#wave { background:#111418; border-radius:2px; min-height:96px; }
+#wave-empty {
+    color:rgba(200,184,154,0.3); font-size:10px; letter-spacing:2px;
+    text-align:center; padding:34px 0; text-transform:uppercase;
+}
+#controls {
+    display:flex; gap:10px; align-items:center; padding:6px 0; font-size:10px; letter-spacing:1px;
+}
+#controls button {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.25);
+    color:#c8b89a; padding:4px 10px; font-size:10px; letter-spacing:1px;
+    cursor:pointer; font-family:Georgia,serif; text-transform:uppercase;
+}
+#controls button:hover { background:rgba(200,184,154,0.15); }
+#controls .time { font-variant-numeric:tabular-nums; color:rgba(200,184,154,0.5); margin-left:auto; }
+#controls label { color:rgba(200,184,154,0.5); }
+#controls input[type=range] { width:90px; }
+
+#details {
+    flex:1; overflow-y:auto; padding:18px 24px; font-size:11px; line-height:1.6;
+    scrollbar-width:thin; scrollbar-color:#2a2418 transparent;
+}
+#details h2 {
+    font-size:10px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(200,184,154,0.4); margin:18px 0 8px; font-weight:normal;
+}
+#details .kv { display:grid; grid-template-columns:140px 1fr; gap:4px 16px; font-size:10px; }
+#details .kv .k { color:rgba(200,184,154,0.45); letter-spacing:1px; text-transform:uppercase; font-size:9px; }
+#details .kv .v { color:#c8b89a; font-variant-numeric:tabular-nums; }
+#details .toks { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+#details .tok {
+    font-size:9px; letter-spacing:1px; padding:2px 6px;
+    background:rgba(200,184,154,0.08); border:1px solid rgba(200,184,154,0.15);
+    color:rgba(200,184,154,0.7);
+}
+.path { font-family:Menlo,monospace; font-size:9px; color:rgba(200,184,154,0.4); }
+
+.loading { text-align:center; padding:40px 20px; color:rgba(200,184,154,0.3); font-size:10px; letter-spacing:2px; }
+.lufs-col { color:rgba(200,184,154,0.4); }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+    <input id="search" type="search" placeholder="SEARCH NAME OR TAGS…" autocomplete="off">
+
+    <div id="vendor-picker" class="picker-row">
+        <span class="label">Vendor</span>
+    </div>
+    <div id="pack-picker" class="picker-row">
+        <span class="label">Pack</span>
+    </div>
+    <div id="category-picker" class="picker-row">
+        <span class="label">Category</span>
+    </div>
+
+    <div id="list">
+        <div class="loading">loading catalog…</div>
+    </div>
+    <div id="count">—</div>
+</aside>
+
+<section id="main">
+    <div id="now-playing">
+        <div id="np-name">—</div>
+        <div id="np-sub">select a clip to audition</div>
+        <div id="wave"><div id="wave-empty">no waveform</div></div>
+        <div id="controls">
+            <button id="btn-play" disabled>▶ Play</button>
+            <button id="btn-stop" disabled>■ Stop</button>
+            <label>vol <input id="vol" type="range" min="0" max="100" value="80"></label>
+            <span class="time"><span id="time-cur">0:00</span> / <span id="time-dur">0:00</span></span>
+        </div>
+    </div>
+    <div id="details"><div class="loading">no clip selected</div></div>
+</section>
+
+<script src="https://unpkg.com/wavesurfer.js@7"></script>
+<script type="module">
+// Pack manifest — every CSV we want this browser to load.
+// If you add a new pack: import → extract → measure → add its slug here.
+const PACKS = [
+    { vendor: 'filmcow',       slug: 'designed-sfx',          csv: 'filmcow-designed-sfx.csv' },
+    { vendor: 'filmcow',       slug: 'recorded-sfx',          csv: 'filmcow-recorded-sfx.csv' },
+    { vendor: 'cyberofficial', slug: 'sfx-pack/buttons',      csv: 'cyberofficial-sfx-pack-buttons.csv' },
+    { vendor: 'cyberofficial', slug: 'sfx-pack/guns',         csv: 'cyberofficial-sfx-pack-guns.csv' },
+    { vendor: 'cyberofficial', slug: 'sfx-pack/radio',        csv: 'cyberofficial-sfx-pack-radio.csv' },
+    { vendor: 'cyberofficial', slug: 'sfx-pack/zombie',       csv: 'cyberofficial-sfx-pack-zombie.csv' },
+    { vendor: 'dillonbecker',  slug: 'super-dialogue-v1',     csv: 'dillonbecker-super-dialogue-v1.csv' },
+];
+
+const state = {
+    rows: [],               // all loaded rows, each annotated with vendor/slug
+    filtered: [],           // rows matching current filters
+    active: null,           // currently selected row
+    vendor: '__all__',
+    pack:   '__all__',
+    category: '__all__',
+    query: '',
+};
+
+function parseCsv(text) {
+    // Minimal CSV parser — supports quoted fields + embedded commas/newlines.
+    const rows = [];
+    let cur = [], field = '', inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+            else if (c === '"') { inQuotes = false; }
+            else { field += c; }
+        } else {
+            if (c === '"') inQuotes = true;
+            else if (c === ',') { cur.push(field); field = ''; }
+            else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
+            else if (c === '\r') { /* skip */ }
+            else { field += c; }
+        }
+    }
+    if (field.length || cur.length) { cur.push(field); rows.push(cur); }
+    if (!rows.length) return [];
+    const hdr = rows[0];
+    return rows.slice(1)
+        .filter(r => r.length === hdr.length)
+        .map(r => Object.fromEntries(hdr.map((h, i) => [h, r[i]])));
+}
+
+async function loadAll() {
+    const listing = await Promise.all(PACKS.map(async p => {
+        try {
+            const res = await fetch(`/manifest/${p.csv}`);
+            if (!res.ok) { console.warn(`skip ${p.csv}: ${res.status}`); return []; }
+            const text = await res.text();
+            const rows = parseCsv(text);
+            return rows.map(r => ({ ...r, __vendor: p.vendor, __slug: p.slug }));
+        } catch (e) {
+            console.warn(`skip ${p.csv}:`, e);
+            return [];
+        }
+    }));
+    state.rows = listing.flat();
+    buildPickers();
+    applyFilters();
+}
+
+function buildPickers() {
+    // Vendor picker
+    const vendors = [...new Set(state.rows.map(r => r.__vendor))].sort();
+    renderPicker('#vendor-picker', '__all__', vendors, v => pickVendor(v));
+    // initial pack + category fill
+    rebuildPackPicker();
+    rebuildCategoryPicker();
+}
+
+function renderPicker(sel, allKey, values, onClick) {
+    const el = document.querySelector(sel);
+    const label = el.querySelector('.label');
+    [...el.querySelectorAll('.pill')].forEach(n => n.remove());
+    const makePill = (val, display) => {
+        const b = document.createElement('div');
+        b.className = 'pill';
+        b.textContent = display;
+        b.dataset.val = val;
+        b.addEventListener('click', () => onClick(val));
+        el.appendChild(b);
+        return b;
+    };
+    makePill(allKey, 'ALL');
+    for (const v of values) makePill(v, v);
+    refreshActivePill(sel);
+}
+function refreshActivePill(sel) {
+    const el = document.querySelector(sel);
+    const key = sel === '#vendor-picker' ? state.vendor
+              : sel === '#pack-picker'   ? state.pack
+              : state.category;
+    [...el.querySelectorAll('.pill')].forEach(p => {
+        p.classList.toggle('active', p.dataset.val === key);
+    });
+}
+
+function pickVendor(v) {
+    state.vendor = v;
+    state.pack = '__all__';
+    state.category = '__all__';
+    rebuildPackPicker();
+    rebuildCategoryPicker();
+    applyFilters();
+    refreshActivePill('#vendor-picker');
+}
+function pickPack(v) {
+    state.pack = v;
+    state.category = '__all__';
+    rebuildCategoryPicker();
+    applyFilters();
+    refreshActivePill('#pack-picker');
+}
+function pickCategory(v) {
+    state.category = v;
+    applyFilters();
+    refreshActivePill('#category-picker');
+}
+
+function rebuildPackPicker() {
+    let rows = state.rows;
+    if (state.vendor !== '__all__') rows = rows.filter(r => r.__vendor === state.vendor);
+    const slugs = [...new Set(rows.map(r => r.__slug))].sort();
+    renderPicker('#pack-picker', '__all__', slugs, v => pickPack(v));
+}
+function rebuildCategoryPicker() {
+    let rows = state.rows;
+    if (state.vendor !== '__all__') rows = rows.filter(r => r.__vendor === state.vendor);
+    if (state.pack   !== '__all__') rows = rows.filter(r => r.__slug === state.pack);
+    const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
+    renderPicker('#category-picker', '__all__', cats, v => pickCategory(v));
+}
+
+function applyFilters() {
+    const q = state.query.trim().toLowerCase();
+    state.filtered = state.rows.filter(r => {
+        if (state.vendor !== '__all__' && r.__vendor !== state.vendor) return false;
+        if (state.pack   !== '__all__' && r.__slug   !== state.pack  ) return false;
+        if (state.category !== '__all__' && r.category !== state.category) return false;
+        if (q) {
+            const hay = `${r.name || ''} ${r.category || ''} ${r.inferred_tokens || ''} ${r.dialogue_speaker || ''} ${r.dialogue_group || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
+    renderList();
+}
+
+function fmtDuration(s) {
+    const n = parseFloat(s || '0');
+    if (!n) return '—';
+    if (n < 60) return `${n.toFixed(2)}s`;
+    const m = Math.floor(n / 60), r = n - m*60;
+    return `${m}:${r.toFixed(0).padStart(2,'0')}`;
+}
+function fmtTime(t) {
+    const m = Math.floor(t / 60), s = Math.floor(t - m*60);
+    return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+function renderList() {
+    const el = document.getElementById('list');
+    el.innerHTML = '';
+    const max = 500;
+    const rows = state.filtered.slice(0, max);
+    for (const r of rows) {
+        const item = document.createElement('div');
+        item.className = 'item';
+        const variants = parseInt(r.variants || '1', 10);
+        const lufs = (r.integrated_lufs || '').replace(/^(-?\d+\.\d{1}).*$/, '$1');
+        item.innerHTML = `
+            <span class="name">${escapeHtml(r.name)}${variants > 1 ? ` <span class="lufs-col">×${variants}</span>` : ''}</span>
+            <span class="pack-tag">${escapeHtml(r.__vendor)}/${escapeHtml(r.category || '')}</span>
+            <span class="meta">${fmtDuration(r.duration_s)}${lufs ? ` · ${lufs}L` : ''}</span>
+        `;
+        item.addEventListener('click', () => selectRow(r, item));
+        el.appendChild(item);
+    }
+    document.getElementById('count').textContent =
+        state.filtered.length > max
+            ? `${max}/${state.filtered.length} shown · refine filters`
+            : `${state.filtered.length} clips`;
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+let ws = null;
+
+function selectRow(r, itemEl) {
+    state.active = r;
+    [...document.querySelectorAll('#list .item')].forEach(n => n.classList.remove('active'));
+    if (itemEl) itemEl.classList.add('active');
+
+    const url = `/assets/${r.__vendor}/${r.__slug}/${r.path}`;
+    document.getElementById('np-name').textContent = r.name;
+    document.getElementById('np-sub').textContent = `${r.__vendor}/${r.__slug} · ${r.category || ''}`;
+
+    // Details panel
+    renderDetails(r, url);
+
+    // Waveform
+    const waveEl = document.getElementById('wave');
+    waveEl.innerHTML = '';
+    if (ws) { try { ws.destroy(); } catch {} ws = null; }
+    ws = WaveSurfer.create({
+        container: waveEl,
+        waveColor: 'rgba(200,184,154,0.35)',
+        progressColor: 'rgba(232,216,176,0.95)',
+        cursorColor: 'rgba(232,216,176,0.9)',
+        height: 96,
+        barWidth: 2,
+        barGap: 1,
+        normalize: true,
+        url,
+    });
+    const btnPlay = document.getElementById('btn-play');
+    const btnStop = document.getElementById('btn-stop');
+    btnPlay.disabled = false; btnStop.disabled = false;
+    btnPlay.textContent = '▶ Play';
+    ws.on('ready', () => {
+        document.getElementById('time-dur').textContent = fmtTime(ws.getDuration());
+    });
+    ws.on('timeupdate', t => {
+        document.getElementById('time-cur').textContent = fmtTime(t);
+    });
+    ws.on('finish', () => { btnPlay.textContent = '▶ Play'; });
+    ws.setVolume(document.getElementById('vol').value / 100);
+}
+
+function renderDetails(r, url) {
+    const tokens = (r.inferred_tokens || '').split(/\s+/).filter(Boolean);
+    const dialogue = r.dialogue_speaker || r.dialogue_group;
+    const rows = [
+        ['Pack',       `${r.__vendor}/${r.__slug}`],
+        ['Category',   r.category || '—'],
+        ['Variants',   r.variants || '1'],
+        ['Duration',   fmtDuration(r.duration_s)],
+        ['Size',       `${r.size_mb || '—'} MB`],
+        ['Format',     `${r.format || '—'} (${r.codec || '—'})`],
+        ['Channels',   r.channels || '—'],
+        ['Sample rate',r.sample_rate ? `${r.sample_rate} Hz` : '—'],
+        ['Bit depth',  r.bit_depth || '—'],
+    ];
+    if (r.integrated_lufs) rows.push(['Integrated', `${r.integrated_lufs} LUFS`]);
+    if (r.peak_dbfs)       rows.push(['True peak',  `${r.peak_dbfs} dBFS`]);
+    if (r.lra_lu)          rows.push(['LRA',        `${r.lra_lu} LU`]);
+    if (dialogue) {
+        rows.push(['Speaker', r.dialogue_speaker || '—']);
+        rows.push(['Gender',  r.dialogue_gender  || '—']);
+        rows.push(['Group',   r.dialogue_group   || '—']);
+    }
+    const kv = rows.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`).join('');
+    const tokHtml = tokens.length
+        ? `<h2>Inferred tokens</h2><div class="toks">${tokens.map(t => `<span class="tok">${escapeHtml(t)}</span>`).join('')}</div>`
+        : '';
+    document.getElementById('details').innerHTML = `
+        <h2>Metadata</h2>
+        <div class="kv">${kv}</div>
+        ${tokHtml}
+        <h2>Path</h2>
+        <div class="path">${escapeHtml(url)}</div>
+    `;
+}
+
+// Controls
+document.getElementById('btn-play').addEventListener('click', () => {
+    if (!ws) return;
+    if (ws.isPlaying()) { ws.pause(); document.getElementById('btn-play').textContent = '▶ Play'; }
+    else                { ws.play();  document.getElementById('btn-play').textContent = '⏸ Pause'; }
+});
+document.getElementById('btn-stop').addEventListener('click', () => {
+    if (!ws) return;
+    ws.stop();
+    document.getElementById('btn-play').textContent = '▶ Play';
+    document.getElementById('time-cur').textContent = '0:00';
+});
+document.getElementById('vol').addEventListener('input', e => {
+    if (ws) ws.setVolume(e.target.value / 100);
+});
+
+// Search (debounced)
+let searchTimer = null;
+document.getElementById('search').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        state.query = e.target.value;
+        applyFilters();
+    }, 120);
+});
+
+// Keyboard: space = play/pause, ↑/↓ = neighbor
+document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        document.getElementById('btn-play').click();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const items = [...document.querySelectorAll('#list .item')];
+        const idx = items.findIndex(n => n.classList.contains('active'));
+        const next = items[(idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
+        if (next) { next.click(); next.scrollIntoView({ block: 'nearest' }); }
+    }
+});
+
+loadAll();
+</script>
+</body>
+</html>
