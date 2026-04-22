@@ -34,3 +34,6 @@ screenshots_debug/
 # ── Build / distribution ─────────────────────────────────────────────────────
 Studio.exe
 node_modules/
+
+# ── Runtime logs ─────────────────────────────────────────────────────────────
+tools/*.log
