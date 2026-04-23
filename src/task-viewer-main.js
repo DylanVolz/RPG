@@ -12,6 +12,7 @@ import {
 import { createTaskGraph } from './task-graph.js';
 import { TaskPanel }       from './task-panel.js';
 import { TaskLanes }       from './task-lanes.js';
+import { TaskClusters }    from './task-clusters.js';
 
 const $ = sel => document.querySelector(sel);
 
@@ -21,7 +22,8 @@ const state = {
     panel: null,        // TaskPanel
     graph: null,        // TaskGraph controller
     lanes: null,        // TaskLanes
-    viewMode: 'lanes',  // 'graph' | 'lanes' — lanes is the primary triage view
+    clusters: null,     // TaskClusters
+    viewMode: 'lanes',  // 'graph' | 'lanes' | 'clusters'
     selectedId: null,
     addDepSource: null, // non-null when user is picking a target
     filters: {
@@ -70,6 +72,7 @@ async function refreshData() {
         const delta = after - before;
         if (state.graph) state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
+        if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
         // Refresh the detail pane if a task is selected and its data changed.
         if (state.selectedTask && state.tasks[state.selectedTask] && state.panel) {
@@ -130,6 +133,12 @@ async function boot() {
             onBackgroundTap:  handleBackgroundTap,
         });
         state.lanes.setData(state.tasks);
+
+        state.clusters = new TaskClusters($('#clusters'), {
+            onTaskTap:        handleNodeTap,
+            onBackgroundTap:  handleBackgroundTap,
+        });
+        state.clusters.setData(state.tasks);
 
         applyCurrentFilter();
         wireFilters();
@@ -204,6 +213,7 @@ function wireFilters() {
         const w = parseInt($('#f-tile-w').value, 10) || 180;
         const h = parseInt($('#f-tile-h').value, 10) || 74;
         if (state.lanes) state.lanes.setTileSize(w, h);
+        if (state.clusters) state.clusters.setTileSize(w, h);
     };
     $('#f-tile-w').addEventListener('input', applyTileSize);
     $('#f-tile-h').addEventListener('input', applyTileSize);
@@ -240,6 +250,7 @@ function applyCurrentFilter() {
     };
     state.graph.applyFilter(matchPred, hidePred);
     if (state.lanes) state.lanes.applyFilter(matchPred, hidePred);
+    if (state.clusters) state.clusters.applyFilter(matchPred, hidePred);
 
     const totalVisible = Object.values(state.tasks)
         .filter(t => !hidePred(t) && matchPred(t)).length;
@@ -250,13 +261,17 @@ function setViewMode(mode) {
     state.viewMode = mode;
     $('#graph').classList.toggle('hidden', mode !== 'graph');
     $('#lanes').classList.toggle('active',  mode === 'lanes');
+    $('#clusters').classList.toggle('active', mode === 'clusters');
     const btnGraph = $('#btn-view-graph');
     const btnLanes = $('#btn-view-lanes');
+    const btnClusters = $('#btn-view-clusters');
     if (btnGraph) btnGraph.classList.toggle('active', mode === 'graph');
     if (btnLanes) btnLanes.classList.toggle('active', mode === 'lanes');
+    if (btnClusters) btnClusters.classList.toggle('active', mode === 'clusters');
     if (state.selectedId) {
         if (mode === 'graph') state.graph && state.graph.select(state.selectedId);
-        else                  state.lanes && state.lanes.select(state.selectedId);
+        else if (mode === 'lanes') state.lanes && state.lanes.select(state.selectedId);
+        else state.clusters && state.clusters.select(state.selectedId);
     }
     if (mode === 'graph' && state.graph) {
         // Cytoscape needs a resize kick when its container un-hides.
@@ -267,6 +282,7 @@ function setViewMode(mode) {
 function wireViewToggle() {
     $('#btn-view-graph').addEventListener('click', () => setViewMode('graph'));
     $('#btn-view-lanes').addEventListener('click', () => setViewMode('lanes'));
+    $('#btn-view-clusters').addEventListener('click', () => setViewMode('clusters'));
 }
 
 // ── Node / edge interaction ────────────────────────────────────────
@@ -281,6 +297,7 @@ async function selectTask(tid) {
     state.selectedId = tid;
     state.graph.select(tid);
     if (state.lanes) state.lanes.select(tid);
+    if (state.clusters) state.clusters.select(tid);
     state.panel.showLoading(tid);
     try {
         const detail = await fetchTaskDetail(tid);
@@ -327,6 +344,7 @@ async function handleStatusChange(tid, to, reason) {
         }
         state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
+        if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
         await selectTask(tid);
         toast(`${tid}: ${result.old || '?'} → ${result.new || to}`);
@@ -347,6 +365,7 @@ async function handlePriorityChange(tid, level) {
         }
         if (state.graph) state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
+        if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
         await selectTask(tid);
         toast(`${tid}: priority → ${level}${result.cleared ? ' (cleared)' : ` (${result.value})`}`);
@@ -410,6 +429,7 @@ async function attemptAddDep(source, target) {
             }
             state.graph.addEdge(source, target);
             if (state.lanes) state.lanes.setData(state.tasks);
+            if (state.clusters) state.clusters.setData(state.tasks);
             applyCurrentFilter();
             await selectTask(source);
             toast(`${source} → ${target} added`);
@@ -430,6 +450,7 @@ async function handleRemoveDep(source, target) {
             state.tasks = enrichTasks(state.tasks);
             state.graph.removeEdge(source, target);
             if (state.lanes) state.lanes.setData(state.tasks);
+            if (state.clusters) state.clusters.setData(state.tasks);
             applyCurrentFilter();
             await selectTask(source);
             toast(`${source} → ${target} removed`);

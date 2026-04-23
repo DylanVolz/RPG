@@ -12,6 +12,8 @@
  * viewport, vertically when total rooms × lane-height exceeds it.
  */
 
+import { compareByTaskqPriority } from './task-priority.js';
+
 const STATUS_COLOR = {
     'not-started':      '#6b7076',
     'in-progress':      '#4a8ccc',
@@ -27,63 +29,6 @@ const STATUS_COLOR = {
 const DONE_STATUSES = new Set([
     'completed', 'completed-by-ai', 'deprecated', 'superseded', 'skipped',
 ]);
-
-const READINESS_ORDER = {
-    'ready': 0, 'in-progress': 1, 'blocked': 2, 'blocked-by-deps': 3, 'future': 4, 'done': 5,
-};
-
-function isWalkthroughInvolved(t) {
-    return t.type === 'walkthrough' || t.verifiable_by === 'walkthrough';
-}
-
-/**
- * Impact-aware comparator — layered on top of taskq.py cmd_ready's sort key
- * with an extra `is_walkthrough` penalty so auto-testable tasks drain first
- * and walkthrough-involved ones defer to the end of their tier:
- *   1. priority_boost   DESC (manual override)
- *   2. is_mvp           DESC
- *   3. mvp_order        ASC  (missing → end)
- *   4. is_walkthrough   ASC  (non-walk first → walks last within tier)
- *   5. unblocks_count   DESC (bottlenecks first)
- *   6. priority == EA   DESC
- *   7. phase            ASC
- *   8. id               ASC (stable tiebreaker)
- *
- * Rationale for #4's placement: explicit user intent (boost + MVP + build
- * order) outranks pipeline-practicality, but among peers we prefer the
- * lanes that can ship unsupervised.
- */
-function impactSortKey(a, b) {
-    const ba = (a.priority_boost | 0);
-    const bb = (b.priority_boost | 0);
-    if (ba !== bb) return bb - ba;
-
-    const ma = a.is_mvp ? 1 : 0;
-    const mb = b.is_mvp ? 1 : 0;
-    if (ma !== mb) return mb - ma;
-
-    const oa = a.mvp_order == null ? 1e9 : a.mvp_order;
-    const ob = b.mvp_order == null ? 1e9 : b.mvp_order;
-    if (oa !== ob) return oa - ob;
-
-    const wa = isWalkthroughInvolved(a) ? 1 : 0;
-    const wb = isWalkthroughInvolved(b) ? 1 : 0;
-    if (wa !== wb) return wa - wb;                 // walkthrough-involved last
-
-    const ua = a.unblocks_count | 0;
-    const ub = b.unblocks_count | 0;
-    if (ua !== ub) return ub - ua;
-
-    const ea = (a.priority === 'EA') ? 1 : 0;
-    const eb = (b.priority === 'EA') ? 1 : 0;
-    if (ea !== eb) return eb - ea;
-
-    const pa = String(a.phase || '99');
-    const pb = String(b.phase || '99');
-    if (pa !== pb) return pa.localeCompare(pb, undefined, { numeric: true });
-
-    return (a.id || '').localeCompare(b.id || '');
-}
 
 export class TaskLanes {
     constructor(container, opts = {}) {
@@ -208,11 +153,9 @@ export class TaskLanes {
                 if (!byRank.has(r)) byRank.set(r, []);
                 byRank.get(r).push(t);
             }
-            // Within-rank sort mirrors tools/taskq.py cmd_ready's impact key:
-            //   (−boost, −is_mvp, mvp_order, −unblocks, −EA, phase, id)
-            // so tile stacking at a given dep-depth matches what the CLI
-            // would surface as "most impactful to ship next" inside the ties.
-            for (const [, ts] of byRank) ts.sort(impactSortKey);
+            // Within-rank sort mirrors tools/taskq.py's ready ordering so
+            // stacks read the same way as the CLI queue.
+            for (const [, ts] of byRank) ts.sort(compareByTaskqPriority);
 
             // Ghost tiles: per cross-room dep, dedupe by upstream T-ID so
             // multiple downstream tasks depending on the same upstream in

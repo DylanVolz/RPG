@@ -75,7 +75,7 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  #graph, #lanes {
+  #graph, #lanes, #clusters {
     grid-area: graph;
     background: var(--bg);
     position: relative;
@@ -93,7 +93,204 @@
     --lane-header-w: 150px;
   }
   #lanes.active { display: block; }
+  #clusters {
+    display: none; overflow: auto;
+    --tile-w: 180px;
+    --tile-h: 74px;
+    --cluster-row-h: calc(var(--tile-h) * 3.1);
+    --cluster-col-w: max(300px, calc(var(--tile-w) * 1.6));
+    --cluster-row-gap: 34px;
+    --cluster-col-gap: 22px;
+  }
+  #clusters.active { display: block; }
   #graph.hidden { display: none; }
+
+  #clusters-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--cluster-col-w);
+    grid-template-rows: repeat(2, var(--cluster-row-h));
+    gap: var(--cluster-row-gap) var(--cluster-col-gap);
+    padding: 22px 20px 42px;
+    align-items: stretch;
+    align-content: start;
+    min-width: max-content;
+    min-height: calc(var(--cluster-row-h) * 2 + var(--cluster-row-gap) + 64px);
+    position: relative;
+  }
+  #clusters-grid::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--cluster-row-h) + (var(--cluster-row-gap) / 2));
+    height: 2px;
+    background:
+      linear-gradient(90deg,
+        rgba(212,168,75,0.0) 0%,
+        rgba(212,168,75,0.45) 8%,
+        rgba(212,168,75,0.18) 100%);
+    pointer-events: none;
+  }
+  .cluster-card {
+    min-height: calc(var(--tile-h) * 2.65);
+    background: var(--bg-elev);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 120ms, transform 120ms, box-shadow 120ms;
+    position: relative;
+  }
+  .cluster-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .cluster-card.selected {
+    border-color: #ffd76e;
+    background: rgba(212,168,75,0.12);
+    box-shadow: 0 0 0 2px rgba(212,168,75,0.3);
+  }
+  .cluster-card.timeline-top { align-self: end; }
+  .cluster-card.timeline-bottom { align-self: start; }
+  .cluster-card.timeline-top::after,
+  .cluster-card.timeline-bottom::after {
+    content: '';
+    position: absolute;
+    left: 26px;
+    width: 2px;
+    height: calc((var(--cluster-row-gap) / 2) + 12px);
+    background: linear-gradient(180deg, rgba(212,168,75,0.55), rgba(212,168,75,0.15));
+    pointer-events: none;
+  }
+  .cluster-card.timeline-top::after { bottom: -29px; }
+  .cluster-card.timeline-bottom::after { top: -29px; }
+  .cluster-card::before {
+    content: '';
+    position: absolute;
+    left: 21px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(212,168,75,0.12);
+    pointer-events: none;
+  }
+  .cluster-card.timeline-top::before { bottom: -35px; }
+  .cluster-card.timeline-bottom::before { top: -35px; }
+  .cluster-head { display: flex; flex-direction: column; gap: 2px; }
+  .cluster-title {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    word-break: break-word;
+  }
+  .cluster-sub {
+    color: var(--fg-dim);
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .cluster-chips {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    min-height: 18px;
+  }
+  .cluster-chips .chip,
+  .cluster-link-chip {
+    padding: 1px 6px;
+    border: 1px solid rgba(200,184,154,0.18);
+    border-radius: 2px;
+    font-size: 10px;
+    color: var(--fg-dim);
+    background: transparent;
+  }
+  .cluster-chips .chip.ready { color: #5c9c54; border-color: rgba(92,156,84,0.45); }
+  .cluster-chips .chip.active { color: #4a8ccc; border-color: rgba(74,140,204,0.5); }
+  .cluster-best,
+  .cluster-more,
+  .cluster-link-empty {
+    color: var(--fg-dim);
+    font-size: 10px;
+  }
+  .cluster-best {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .cluster-best-link,
+  .cluster-link-chip,
+  .cluster-task-row {
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+  }
+  .cluster-best-link { color: var(--accent); }
+  .cluster-best-link:hover,
+  .cluster-link-chip:hover,
+  .cluster-task-row:hover { color: #ffd76e; border-color: rgba(212,168,75,0.25); }
+  .cluster-members {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 auto;
+  }
+  .cluster-task-row {
+    display: grid;
+    grid-template-columns: 10px auto 1fr;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 6px;
+    border-radius: 3px;
+    background: rgba(200,184,154,0.04);
+  }
+  .cluster-task-row .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .cluster-task-row .tid {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 10px;
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .cluster-task-row .title {
+    font-size: 11px;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cluster-links {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .cluster-link-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .cluster-link-row .lbl {
+    color: var(--fg-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 52px;
+  }
+  .cluster-link-chip .n { color: var(--fg-dim); }
+  .cluster-index {
+    color: var(--fg-dim);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
 
   #lanes-grid {
     display: grid;
@@ -332,6 +529,7 @@
     <span style="margin-left:8px; color:var(--fg-dim);">view</span>
     <button id="btn-view-graph" title="swimlane DAG">graph</button>
     <button id="btn-view-lanes" class="active" title="horizontal lanes table">lanes</button>
+    <button id="btn-view-clusters" title="cluster summary cards">clusters</button>
 
     <span class="tile-size-ctl" style="margin-left:8px; color:var(--fg-dim); display:flex; align-items:center; gap:4px;">
       tile
@@ -352,6 +550,7 @@
   </div>
 
   <div id="lanes"><div id="lanes-grid"></div></div>
+  <div id="clusters"><div id="clusters-grid"></div></div>
 
   <div id="details">
     <p style="color: var(--fg-dim); font-style: italic;">
