@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Thumbnail Cache — Test</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+
+#header {
+    display:flex; align-items:center; gap:14px;
+    padding:10px 16px; flex-shrink:0;
+    background:#0a0c0e;
+    border-bottom:1px solid rgba(200,184,154,0.12);
+}
+#header h1 {
+    font-size:12px; font-weight:normal; letter-spacing:4px; text-transform:uppercase;
+    color:rgba(200,184,154,0.55);
+}
+#pack-sel, .btn {
+    background:rgba(200,184,154,0.06); border:1px solid rgba(200,184,154,0.2);
+    color:#c8b89a; padding:5px 10px; font-family:inherit; font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; outline:none;
+}
+#pack-sel:hover, .btn:hover { background:rgba(200,184,154,0.12); color:#e8d8b4; border-color:rgba(200,184,154,0.45); }
+.btn:disabled { opacity:0.35; cursor:not-allowed; }
+#stats {
+    margin-left:auto; font-size:10px; letter-spacing:1.5px;
+    color:rgba(200,184,154,0.55); font-variant-numeric: tabular-nums;
+}
+#smoke-status { font-size:10px; letter-spacing:1.5px; padding:2px 8px; border-radius:2px; }
+#smoke-status.pass { background:rgba(90,160,90,0.18); color:#9fe09f; }
+#smoke-status.fail { background:rgba(200,90,90,0.22); color:#f4a5a5; }
+#smoke-status.run  { background:rgba(200,184,154,0.10); color:#c8b89a; }
+
+#grid {
+    flex:1; overflow-y:auto; padding:14px;
+    display:grid; gap:10px;
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+    align-content:start;
+    scrollbar-width:thin; scrollbar-color:#2a2418 transparent;
+}
+.cell {
+    position:relative; background:rgba(35,25,15,0.8);
+    border:1px solid rgba(200,160,80,0.12); border-radius:4px;
+    overflow:hidden; aspect-ratio:1;
+    display:flex; align-items:flex-end; justify-content:center;
+}
+.cell img {
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    background:#14181d;
+}
+.cell .label {
+    position:relative; z-index:1;
+    width:100%; padding:4px 6px;
+    font-size:9px; color:#e8d8b4; letter-spacing:0.4px;
+    background:linear-gradient(transparent, rgba(0,0,0,0.75) 30%);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cell.pending { background:repeating-linear-gradient(45deg, #191c20 0 8px, #13161a 8px 16px); }
+.cell.error   { background:rgba(120,40,40,0.2); color:#f4a5a5; }
+.cell .spin {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:14px; height:14px; border:1.5px solid rgba(200,184,154,0.2);
+    border-top-color:rgba(200,184,154,0.7); border-radius:50%;
+    animation:spin 1s linear infinite;
+}
+@keyframes spin { to { transform:translate(-50%,-50%) rotate(360deg); } }
+
+#empty {
+    flex:1; display:flex; align-items:center; justify-content:center;
+    color:rgba(200,184,154,0.3); font-size:11px; letter-spacing:2px; text-transform:uppercase;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<div id="header">
+    <h1>✦ Thumbnail Cache</h1>
+    <select id="pack-sel"></select>
+    <button id="render-all" class="btn" title="Render every thumbnail in this pack (warms the cache).">Render all</button>
+    <button id="clear-cache" class="btn" title="Delete every cached PNG in IndexedDB.">Clear cache</button>
+    <button id="smoke" class="btn" title="Run a minimal automated verification of the cache module.">Smoke test</button>
+    <span id="smoke-status"></span>
+    <span id="stats">—</span>
+</div>
+
+<div id="grid"></div>
+<div id="empty" hidden>Select a pack to preview thumbnails.</div>
+
+<script type="module">
+import { loadManifest, assetUrl } from './src/manifest-loader.js';
+import { getThumbnail, hasCached, clearCache, cacheStats } from './src/thumbnail-cache.js';
+
+// AnimPicStudio packs — same vendor all the way down (matches the kit browsers).
+const VENDOR = 'animpicstudio';
+const PACKS = [
+    'poly-farm',
+    'poly-forest-village',
+    'poly-mega-survival-construction-kit',
+    'poly-mega-survival-food',
+    'poly-mega-survival-kit',
+    'poly-mega-survival-medical-kit',
+    'poly-mega-survival-tools',
+    'poly-mega-vehicle-kit',
+    'poly-mega-weapons-kit',
+    'poly-military-shooting-range',
+    'poly-nature-pack',
+    'poly-survival-melee-weapons',
+    'poly-survival-subway',
+    'poly-survival-workshop',
+];
+
+// TODO(T-0200): expose as tunable (cap rows to keep first-render manageable on
+// 400+ item packs — humans browsing the grid never need all at once).
+const MAX_ROWS = 120;
+
+// ── UI wiring ────────────────────────────────────────────────────────────────
+const packSel = document.getElementById('pack-sel');
+const gridEl  = document.getElementById('grid');
+const emptyEl = document.getElementById('empty');
+const statsEl = document.getElementById('stats');
+const renderAllBtn = document.getElementById('render-all');
+const clearBtn = document.getElementById('clear-cache');
+const smokeBtn = document.getElementById('smoke');
+const smokeStatus = document.getElementById('smoke-status');
+
+for (const pack of PACKS) {
+    const opt = document.createElement('option');
+    opt.value = pack;
+    opt.textContent = pack;
+    packSel.appendChild(opt);
+}
+
+let sessionHits = 0;
+let sessionMisses = 0;
+
+async function refreshStats() {
+    const { entries } = await cacheStats();
+    statsEl.textContent = `${entries} cached · ${sessionHits} hits · ${sessionMisses} misses (session)`;
+}
+
+async function loadPack(pack) {
+    gridEl.innerHTML = '';
+    emptyEl.hidden = true;
+    let manifest;
+    try {
+        manifest = await loadManifest(pack);
+    } catch (e) {
+        gridEl.innerHTML = `<div class="cell error"><span class="label">Manifest load failed: ${e.message}</span></div>`;
+        return;
+    }
+    const rows = manifest.slice(0, MAX_ROWS);
+    if (rows.length === 0) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = 'No rows in manifest';
+        return;
+    }
+    for (const row of rows) {
+        const cell = document.createElement('div');
+        cell.className = 'cell pending';
+        cell.dataset.url = assetUrl(VENDOR, pack, row);
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = row.name;
+        const spin = document.createElement('div');
+        spin.className = 'spin';
+        cell.appendChild(spin);
+        cell.appendChild(label);
+        gridEl.appendChild(cell);
+    }
+    // Kick off thumbnail loads with a small concurrency limit so we don't
+    // stall the main thread rendering all 120 GLBs at once.
+    const urls = rows.map(r => assetUrl(VENDOR, pack, r));
+    await loadThumbsWithLimit(urls, 4);
+    await refreshStats();
+}
+
+async function loadThumbsWithLimit(urls, limit) {
+    let idx = 0;
+    async function worker() {
+        while (idx < urls.length) {
+            const i = idx++;
+            const url = urls[i];
+            const cell = gridEl.children[i];
+            if (!cell) continue;
+            const wasCached = await hasCached(url);
+            try {
+                const blobUrl = await getThumbnail(url);
+                if (wasCached) sessionHits++; else sessionMisses++;
+                const img = document.createElement('img');
+                img.src = blobUrl;
+                img.alt = cell.dataset.url;
+                cell.insertBefore(img, cell.firstChild);
+                cell.classList.remove('pending');
+                cell.querySelector('.spin')?.remove();
+            } catch (e) {
+                cell.classList.remove('pending');
+                cell.classList.add('error');
+                cell.querySelector('.spin')?.remove();
+                const errLabel = cell.querySelector('.label');
+                if (errLabel) errLabel.textContent = `${cell.dataset.url.split('/').pop()} — ${e.message}`;
+            }
+        }
+    }
+    const workers = Array.from({ length: Math.min(limit, urls.length) }, () => worker());
+    await Promise.all(workers);
+}
+
+packSel.addEventListener('change', () => loadPack(packSel.value));
+renderAllBtn.addEventListener('click', () => loadPack(packSel.value));
+clearBtn.addEventListener('click', async () => {
+    await clearCache();
+    sessionHits = 0;
+    sessionMisses = 0;
+    await refreshStats();
+    await loadPack(packSel.value);
+});
+
+// ── Smoke test ───────────────────────────────────────────────────────────────
+// Minimal in-browser verification of the cache contract: render, cache, hit.
+async function runSmoke() {
+    smokeStatus.className = 'run';
+    smokeStatus.textContent = 'Running…';
+    const pack = packSel.value;
+    try {
+        const manifest = await loadManifest(pack);
+        if (manifest.length < 1) throw new Error('manifest is empty');
+        const row = manifest[0];
+        const url = assetUrl(VENDOR, pack, row);
+
+        await clearCache();
+        if (await hasCached(url)) throw new Error('hasCached should be false after clearCache');
+
+        const a = await getThumbnail(url);
+        if (!a.startsWith('blob:')) throw new Error(`expected blob URL, got ${a}`);
+        if (!await hasCached(url)) throw new Error('hasCached should be true after getThumbnail');
+
+        const b = await getThumbnail(url);
+        if (!b.startsWith('blob:')) throw new Error(`second call returned non-blob: ${b}`);
+
+        const stats1 = await cacheStats();
+        if (stats1.entries < 1) throw new Error(`expected >=1 entries, got ${stats1.entries}`);
+
+        await clearCache();
+        const stats2 = await cacheStats();
+        if (stats2.entries !== 0) throw new Error(`expected 0 entries after clear, got ${stats2.entries}`);
+
+        URL.revokeObjectURL(a);
+        URL.revokeObjectURL(b);
+
+        smokeStatus.className = 'pass';
+        smokeStatus.textContent = 'PASS';
+    } catch (e) {
+        console.error('smoke test failed:', e);
+        smokeStatus.className = 'fail';
+        smokeStatus.textContent = 'FAIL: ' + e.message;
+    }
+    await refreshStats();
+    // Reload the pack so the user sees fresh thumbnails post-smoke.
+    await loadPack(pack);
+}
+smokeBtn.addEventListener('click', runSmoke);
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+(async () => {
+    await refreshStats();
+    packSel.value = PACKS[0];
+    await loadPack(PACKS[0]);
+})();
+</script>
+
+<script src="src/nav.js"></script>
+</body>
+</html>
