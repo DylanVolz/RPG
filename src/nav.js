@@ -50,6 +50,7 @@
         { label: 'Melee Weapons',   id: 'melee-weapons-browser', icon: '🗡', cat: 'Environnement' },
         { label: 'Subway',          id: 'subway-browser',    icon: '🚇', cat: 'Environnement' },
         { label: 'Workshop',        id: 'workshop-browser',  icon: '🔧', cat: 'Environnement' },
+        { label: 'Thumbnail Cache', id: 'thumbnail-test',    icon: '🖼', cat: 'Éditeur' },
         { label: 'World Builder',   id: 'world-builder',     icon: '⬡',  cat: 'Éditeur' },
         { label: 'Grip Editor',     id: 'grip-editor',       icon: '✦',  cat: null },
     ];
