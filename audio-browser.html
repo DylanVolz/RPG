@@ -165,6 +165,41 @@ const state = {
     query: '',
 };
 
+// ── URL state ──────────────────────────────────────────────────────
+// Filter selections + currently-selected clip live in window.location.search
+// so a refresh restores the same view. Only non-default values are written.
+const URL_DEFAULTS = { vendor: '__all__', pack: '__all__', category: '__all__', q: '', sel: '' };
+
+function readUrlState() {
+    const p = new URLSearchParams(location.search);
+    return {
+        vendor:   p.get('vendor')   ?? URL_DEFAULTS.vendor,
+        pack:     p.get('pack')     ?? URL_DEFAULTS.pack,
+        category: p.get('category') ?? URL_DEFAULTS.category,
+        q:        p.get('q')        ?? URL_DEFAULTS.q,
+        sel:      p.get('sel')      ?? URL_DEFAULTS.sel,
+    };
+}
+
+function writeUrlState() {
+    const sel = state.active
+        ? `${state.active.__vendor}/${state.active.__slug}/${state.active.path}`
+        : '';
+    const cur = {
+        vendor:   state.vendor,
+        pack:     state.pack,
+        category: state.category,
+        q:        state.query,
+        sel,
+    };
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(cur)) {
+        if (v !== URL_DEFAULTS[k] && v !== '') p.set(k, v);
+    }
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+
 function parseCsv(text) {
     // Minimal CSV parser — supports quoted fields + embedded commas/newlines.
     const rows = [];
@@ -205,8 +240,42 @@ async function loadAll() {
         }
     }));
     state.rows = listing.flat();
+
+    // Hydrate filter state from URL — clamp to values that still exist in
+    // the loaded catalog so a stale URL doesn't strand the picker on an
+    // empty pack.
+    const url = readUrlState();
+    const vendors = new Set(state.rows.map(r => r.__vendor));
+    if (vendors.has(url.vendor) || url.vendor === '__all__') state.vendor = url.vendor;
+    const packsForVendor = new Set(state.rows
+        .filter(r => state.vendor === '__all__' || r.__vendor === state.vendor)
+        .map(r => r.__slug));
+    if (packsForVendor.has(url.pack) || url.pack === '__all__') state.pack = url.pack;
+    const cats = new Set(state.rows
+        .filter(r => state.vendor === '__all__' || r.__vendor === state.vendor)
+        .filter(r => state.pack === '__all__'   || r.__slug   === state.pack)
+        .map(r => r.category).filter(Boolean));
+    if (cats.has(url.category) || url.category === '__all__') state.category = url.category;
+    state.query = url.q;
+    document.getElementById('search').value = state.query;
+
     buildPickers();
     applyFilters();
+
+    // Restore clip selection (sel = "<vendor>/<slug>/<path>")
+    if (url.sel) {
+        const want = state.rows.find(r => `${r.__vendor}/${r.__slug}/${r.path}` === url.sel);
+        if (want) {
+            // Defer one tick so the DOM list is populated before we scroll.
+            setTimeout(() => {
+                const items = [...document.querySelectorAll('#list .item')];
+                const itemEl = items.find(el => el.querySelector('.name')?.textContent.startsWith(want.name));
+                selectRow(want, itemEl);
+                if (itemEl) itemEl.scrollIntoView({ block: 'center' });
+            }, 0);
+        }
+    }
+    writeUrlState();
 }
 
 function buildPickers() {
@@ -253,6 +322,7 @@ function pickVendor(v) {
     rebuildCategoryPicker();
     applyFilters();
     refreshActivePill('#vendor-picker');
+    writeUrlState();
 }
 function pickPack(v) {
     state.pack = v;
@@ -260,11 +330,13 @@ function pickPack(v) {
     rebuildCategoryPicker();
     applyFilters();
     refreshActivePill('#pack-picker');
+    writeUrlState();
 }
 function pickCategory(v) {
     state.category = v;
     applyFilters();
     refreshActivePill('#category-picker');
+    writeUrlState();
 }
 
 function rebuildPackPicker() {
@@ -342,6 +414,7 @@ let ws = null;
 
 function selectRow(r, itemEl) {
     state.active = r;
+    writeUrlState();
     [...document.querySelectorAll('#list .item')].forEach(n => n.classList.remove('active'));
     if (itemEl) itemEl.classList.add('active');
 
@@ -439,6 +512,7 @@ document.getElementById('search').addEventListener('input', e => {
     searchTimer = setTimeout(() => {
         state.query = e.target.value;
         applyFilters();
+        writeUrlState();
     }, 120);
 });
 
@@ -458,5 +532,6 @@ document.addEventListener('keydown', e => {
 
 loadAll();
 </script>
+<script src="src/nav.js"></script>
 </body>
 </html>

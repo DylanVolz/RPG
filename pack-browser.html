@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Vehicle Kit — Browser</title>
+<title>Pack Browser</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
@@ -13,6 +13,21 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
     border-right:1px solid rgba(200,184,154,0.1);
     display:flex; flex-direction:column; overflow:hidden;
 }
+#pack-pick {
+    background:rgba(200,184,154,0.06); color:#d4a84b;
+    border:none; border-bottom:1px solid rgba(200,184,154,0.12);
+    padding:10px 14px; font-family:'Georgia',serif;
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    outline:none; width:100%; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg, transparent 50%, rgba(200,184,154,0.4) 50%),
+                     linear-gradient(135deg, rgba(200,184,154,0.4) 50%, transparent 50%);
+    background-position:calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size:5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+}
+#pack-pick:hover { background-color:rgba(200,184,154,0.1); }
+#pack-pick option { background:#0a0c0e; color:#c8b89a; }
 #search {
     background:rgba(200,184,154,0.06); border:none;
     border-bottom:1px solid rgba(200,184,154,0.1);
@@ -92,7 +107,8 @@ body { background:#0d0f12; font-family:'Georgia', serif; color:#c8b89a;
 <body>
 
 <div id="sidebar">
-    <input id="search" type="text" placeholder="Search vehicles...">
+    <select id="pack-pick" title="Select asset library"></select>
+    <input id="search" type="text" placeholder="Search...">
     <div id="categories"></div>
     <div id="filters">
         <label for="max-h">≤ h/player</label>
@@ -120,12 +136,47 @@ import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { loadManifest, assetUrl, groupByCategory } from './src/manifest-loader.js';
 import { MetaPanel } from './src/meta-panel.js';
+import { PACKS, PACKS_BY_SLUG, DEFAULT_PACK } from './src/pack-config.js';
 
 const metaPanel = new MetaPanel(document.getElementById('details'));
 
-const VENDOR = 'animpicstudio';
-const PACK = 'poly-mega-vehicle-kit';
 const PLAYER_H = 1.5; // game constant, matches tools/measure_gltf_pack.py
+
+// ── URL state ─────────────────────────────────────────────────────
+// Filters + selection live in window.location.search so a refresh
+// (or copy-paste of the URL) restores the same view. Defaults are
+// elided so the URL stays readable.
+const URL_DEFAULTS = { pack: DEFAULT_PACK, q: '', cat: 'all', maxH: 8, sel: '' };
+
+function readUrl() {
+    const p = new URLSearchParams(location.search);
+    const pack = p.get('pack');
+    return {
+        pack: (pack && PACKS_BY_SLUG[pack]) ? pack : URL_DEFAULTS.pack,
+        q:    p.get('q')   ?? URL_DEFAULTS.q,
+        cat:  p.get('cat') ?? URL_DEFAULTS.cat,
+        maxH: parseFloat(p.get('maxH')) || URL_DEFAULTS.maxH,
+        sel:  p.get('sel') ?? URL_DEFAULTS.sel,
+    };
+}
+
+function writeUrl() {
+    const cur = {
+        pack: currentPack.slug,
+        q:    searchTerm,
+        cat:  activeCat,
+        maxH: maxH === Infinity ? URL_DEFAULTS.maxH : Number(maxH.toFixed(1)),
+        sel:  currentRow ? currentRow.name : '',
+    };
+    const p = new URLSearchParams();
+    if (cur.pack !== URL_DEFAULTS.pack) p.set('pack', cur.pack);
+    if (cur.q && cur.q !== URL_DEFAULTS.q) p.set('q', cur.q);
+    if (cur.cat !== URL_DEFAULTS.cat) p.set('cat', cur.cat);
+    if (cur.maxH !== URL_DEFAULTS.maxH) p.set('maxH', String(cur.maxH));
+    if (cur.sel) p.set('sel', cur.sel);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
 
 // ── Scene ─────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -192,10 +243,10 @@ let currentRow = null;
 const loader = new GLTFLoader();
 const overlay = document.getElementById('loading-overlay');
 
-function loadRow(row) {
+function loadRow(row, opts = {}) {
     overlay.classList.add('visible');
     currentRow = row;
-    metaPanel.show(PACK, row.name);
+    metaPanel.show(currentPack.slug, row.name);
 
     document.getElementById('obj-name').textContent = row.name;
     document.getElementById('obj-details').textContent =
@@ -206,7 +257,9 @@ function loadRow(row) {
 
     if (current) { scene.remove(current); current = null; }
 
-    loader.load(assetUrl(VENDOR, PACK, row), (gltf) => {
+    if (opts.persistUrl !== false) writeUrl();
+
+    loader.load(assetUrl(currentPack.vendor, currentPack.slug, row), (gltf) => {
         const obj = gltf.scene;
         obj.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
 
@@ -248,6 +301,7 @@ function loadRow(row) {
 
 // ── UI state ──────────────────────────────────────────────────────
 let manifest = [];
+let currentPack = PACKS_BY_SLUG[DEFAULT_PACK];
 let activeCat = 'all';
 let searchTerm = '';
 let maxH = Infinity;
@@ -257,6 +311,8 @@ function rebuildCategoryButtons() {
     const counts = new Map();
     for (const [cat, rows] of grouped) counts.set(cat, rows.length);
     const cats = ['all', ...[...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a))];
+    // Drop activeCat if it doesn't exist in the new pack.
+    if (activeCat !== 'all' && !counts.has(activeCat)) activeCat = 'all';
     const catEl = document.getElementById('categories');
     catEl.innerHTML = '';
     cats.forEach(cat => {
@@ -269,14 +325,28 @@ function rebuildCategoryButtons() {
             document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             renderList();
+            writeUrl();
         });
         catEl.appendChild(btn);
+    });
+}
+
+function rebuildPackPicker() {
+    const sel = document.getElementById('pack-pick');
+    const sorted = [...PACKS].sort((a, b) => a.name.localeCompare(b.name));
+    sel.innerHTML = sorted.map(p =>
+        `<option value="${p.slug}">${p.icon ? p.icon + '  ' : ''}${p.name}</option>`
+    ).join('');
+    sel.value = currentPack.slug;
+    sel.addEventListener('change', () => {
+        switchPack(sel.value);
     });
 }
 
 document.getElementById('search').addEventListener('input', e => {
     searchTerm = e.target.value.toLowerCase();
     renderList();
+    writeUrl();
 });
 
 const maxHInput = document.getElementById('max-h');
@@ -286,6 +356,7 @@ maxHInput.addEventListener('input', e => {
     maxH = v >= 7.99 ? Infinity : v;
     maxHVal.textContent = maxH === Infinity ? '∞' : maxH.toFixed(1);
     renderList();
+    writeUrl();
 });
 
 function renderList() {
@@ -301,7 +372,7 @@ function renderList() {
     listEl.innerHTML = '';
     filtered.forEach(row => {
         const el = document.createElement('div');
-        el.className = 'item';
+        el.className = 'item' + (currentRow && currentRow.name === row.name ? ' active' : '');
         el.dataset.name = row.name;
         el.innerHTML = `<span class="name">${row.name}</span><span class="meta">${row.h_m.toFixed(2)}m</span>`;
         el.addEventListener('click', () => loadRow(row));
@@ -310,23 +381,56 @@ function renderList() {
     document.getElementById('count').textContent = `${filtered.length} / ${manifest.length} assets`;
 }
 
-// ── Boot ──────────────────────────────────────────────────────────
-(async () => {
+async function loadPack(pack, opts = {}) {
+    currentPack = pack;
+    document.title = `${pack.name} — Pack Browser`;
+    document.getElementById('search').placeholder = `Search ${pack.name}...`;
     try {
-        manifest = await loadManifest(PACK);
-        console.log(`Loaded manifest: ${manifest.length} rows for ${PACK}`);
+        manifest = await loadManifest(pack.slug);
+        console.log(`Loaded manifest: ${manifest.length} rows for ${pack.slug}`);
         rebuildCategoryButtons();
         renderList();
-        // Auto-load a representative first asset (sorted alphabetically we get an axe).
         if (manifest.length > 0) {
-            const sorted = [...manifest].sort((a, b) => a.name.localeCompare(b.name));
-            loadRow(sorted[0]);
+            const wantSel = opts.sel || '';
+            const initial = (wantSel && manifest.find(r => r.name === wantSel))
+                || [...manifest].sort((a, b) => a.name.localeCompare(b.name))[0];
+            // Don't double-write the URL during boot — the caller normalises it.
+            loadRow(initial, { persistUrl: false });
+        } else {
+            currentRow = null;
+            document.getElementById('obj-name').textContent = '—';
+            document.getElementById('obj-details').textContent = '';
         }
     } catch (err) {
         console.error('Manifest load failed:', err);
         document.getElementById('obj-name').textContent = 'MANIFEST LOAD FAILED';
         document.getElementById('obj-details').textContent = String(err);
     }
+}
+
+async function switchPack(slug) {
+    const pack = PACKS_BY_SLUG[slug];
+    if (!pack || pack.slug === currentPack.slug) return;
+    // Switching pack invalidates the current selection / category.
+    activeCat = 'all';
+    currentRow = null;
+    await loadPack(pack);
+    writeUrl();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────
+(async () => {
+    const url = readUrl();
+    currentPack = PACKS_BY_SLUG[url.pack] || PACKS_BY_SLUG[DEFAULT_PACK];
+    activeCat   = url.cat;
+    searchTerm  = url.q;
+    maxH        = url.maxH >= 7.99 ? Infinity : url.maxH;
+    document.getElementById('search').value = searchTerm;
+    maxHInput.value = url.maxH;
+    maxHVal.textContent = maxH === Infinity ? '∞' : maxH.toFixed(1);
+    rebuildPackPicker();
+    await loadPack(currentPack, { sel: url.sel });
+    writeUrl();
 })();
 
 (function animate() {

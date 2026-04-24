@@ -1,15 +1,16 @@
 /**
  * src/task-viewer-main.js — Orchestrator for task-viewer.html.
  *
- * Fetches tasks, builds the graph, wires filter bar, detail panel, and
- * mutation flows (claim/complete/block + dep add/remove).
+ * Fetches tasks, wires the filter bar, detail panel, and mutation flows
+ * (claim/complete/block + dep add/remove). Views: lanes (default) and
+ * clusters. The cytoscape DAG view was removed — it was the heaviest
+ * dependency and the two tile views cover the same UX.
  */
 
 import {
     fetchAllTasks, fetchTaskDetail, fetchCycleCheck,
     claimTask, setStatus, setPriority, addDep, removeDep, enrichTasks, DONE_STATUSES,
 } from './task-client.js';
-import { createTaskGraph } from './task-graph.js';
 import { TaskPanel }       from './task-panel.js';
 import { TaskLanes }       from './task-lanes.js';
 import { TaskClusters }    from './task-clusters.js';
@@ -20,10 +21,9 @@ const $ = sel => document.querySelector(sel);
 const state = {
     tasks: {},          // id → task (enriched)
     panel: null,        // TaskPanel
-    graph: null,        // TaskGraph controller
     lanes: null,        // TaskLanes
     clusters: null,     // TaskClusters
-    viewMode: 'lanes',  // 'graph' | 'lanes' | 'clusters'
+    viewMode: 'lanes',  // 'lanes' | 'clusters'
     selectedId: null,
     addDepSource: null, // non-null when user is picking a target
     filters: {
@@ -38,6 +38,105 @@ const state = {
         search: '',
     },
 };
+
+// ── Request dedupe / cancellation ───────────────────────────────────
+// Only ever one full-list fetch and one task-detail fetch in flight at
+// a time. Starting a new one aborts the previous, so rapid-fire clicks
+// (or a stacked-up auto-refresh) never queue N slow requests.
+let _allTasksCtrl = null;
+let _detailCtrl   = null;
+
+function _replaceCtrl(ref) {
+    if (ref && !ref.signal.aborted) ref.abort('superseded');
+    return new AbortController();
+}
+
+// ── URL state persistence ───────────────────────────────────────────
+// Filter / view selections live in window.location.search so a browser
+// refresh (or copy-paste of the URL) restores the same view. Only values
+// that diverge from the defaults are written, keeping the URL readable.
+const URL_DEFAULTS = {
+    type: '', status: '', room: '', cluster: '',
+    mvp: false, ready: false, walk: false, hideDone: true,
+    ghosts: true, autoRefresh: false,
+    search: '',
+    view: 'lanes',
+    tileW: 180, tileH: 74,
+    sel: '',
+};
+
+function readUrlParams() {
+    const p = new URLSearchParams(window.location.search);
+    const str  = (k, d) => (p.has(k) ? p.get(k) : d);
+    const bool = (k, d) => {
+        if (!p.has(k)) return d;
+        const v = p.get(k);
+        return v === '1' || v === 'true';
+    };
+    const num  = (k, d) => {
+        const v = parseInt(p.get(k), 10);
+        return Number.isFinite(v) ? v : d;
+    };
+    const rawView = str('view', URL_DEFAULTS.view);
+    // The old graph view is gone — collapse it to lanes.
+    const view = (rawView === 'lanes' || rawView === 'clusters') ? rawView : URL_DEFAULTS.view;
+    return {
+        type:        str('type',        URL_DEFAULTS.type),
+        status:      str('status',      URL_DEFAULTS.status),
+        room:        str('room',        URL_DEFAULTS.room),
+        cluster:     str('cluster',     URL_DEFAULTS.cluster),
+        mvp:         bool('mvp',         URL_DEFAULTS.mvp),
+        ready:       bool('ready',       URL_DEFAULTS.ready),
+        walk:        bool('walk',        URL_DEFAULTS.walk),
+        hideDone:    bool('hideDone',    URL_DEFAULTS.hideDone),
+        ghosts:      bool('ghosts',      URL_DEFAULTS.ghosts),
+        autoRefresh: bool('autoRefresh', URL_DEFAULTS.autoRefresh),
+        search:      str('search',      URL_DEFAULTS.search).trim().toLowerCase(),
+        view,
+        tileW:       num('tileW',       URL_DEFAULTS.tileW),
+        tileH:       num('tileH',       URL_DEFAULTS.tileH),
+        sel:         str('sel',         URL_DEFAULTS.sel),
+    };
+}
+
+function writeUrlParams() {
+    const f = state.filters;
+    const ghostsEl = $('#f-ghosts');
+    const autoEl   = $('#f-autorefresh');
+    const tileWEl  = $('#f-tile-w');
+    const tileHEl  = $('#f-tile-h');
+    const cur = {
+        type:        f.type,
+        status:      f.status,
+        room:        f.room,
+        cluster:     f.cluster,
+        mvp:         f.mvpOnly,
+        ready:       f.readyOnly,
+        walk:        f.walkOnly,
+        hideDone:    f.hideDone,
+        ghosts:      ghostsEl ? ghostsEl.checked : URL_DEFAULTS.ghosts,
+        autoRefresh: autoEl   ? autoEl.checked   : URL_DEFAULTS.autoRefresh,
+        search:      f.search || '',
+        view:        state.viewMode,
+        tileW:       tileWEl ? (parseInt(tileWEl.value, 10) || URL_DEFAULTS.tileW) : URL_DEFAULTS.tileW,
+        tileH:       tileHEl ? (parseInt(tileHEl.value, 10) || URL_DEFAULTS.tileH) : URL_DEFAULTS.tileH,
+        sel:         state.selectedId || '',
+    };
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(cur)) {
+        const def = URL_DEFAULTS[k];
+        if (typeof def === 'boolean') {
+            if (v !== def) p.set(k, v ? '1' : '0');
+        } else if (typeof def === 'number') {
+            if (v !== def) p.set(k, String(v));
+        } else if (v !== def && v !== '') {
+            p.set(k, v);
+        }
+    }
+    const qs = p.toString();
+    const url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    window.history.replaceState(null, '', url);
+}
 
 // ── Toast ───────────────────────────────────────────────────────────
 let toastTimer = null;
@@ -57,26 +156,31 @@ function setStatusBadge(txt) {
 
 // ── Auto-refresh (for watching synth runs live) ─────────────────────
 // Re-fetches tasks every N seconds without tearing down the view. Data is
-// pushed into the existing graph + lanes via setData; filters, selection,
+// pushed into the existing lanes/clusters via setData; filters, selection,
 // and view-mode are preserved. Toggle via the auto-refresh checkbox — off
 // by default so normal reads don't hit the API on a timer.
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 let autoRefreshTimer = null;
+let refreshInFlight  = false;
 
 async function refreshData() {
+    // Drop the tick if the previous refresh is still running — the server
+    // is already busy and we don't want to stack requests.
+    if (refreshInFlight) return;
+    refreshInFlight = true;
+    _allTasksCtrl = _replaceCtrl(_allTasksCtrl);
     try {
-        const raw = await fetchAllTasks();
+        const raw = await fetchAllTasks({ signal: _allTasksCtrl.signal });
         const before = Object.keys(state.tasks).length;
         state.tasks = enrichTasks(raw);
         const after = Object.keys(state.tasks).length;
         const delta = after - before;
-        if (state.graph) state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
         if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
         // Refresh the detail pane if a task is selected and its data changed.
-        if (state.selectedTask && state.tasks[state.selectedTask] && state.panel) {
-            state.panel.show(state.tasks[state.selectedTask], state.tasks);
+        if (state.selectedId && state.tasks[state.selectedId] && state.panel) {
+            state.panel.render(state.tasks[state.selectedId], state.tasks);
         }
         setStatusBadge(`${after} tasks${delta !== 0 ? ` (${delta >= 0 ? '+' : ''}${delta})` : ''}`);
         const now = new Date();
@@ -86,8 +190,11 @@ async function refreshData() {
         const lbl = $('#autorefresh-last');
         if (lbl) lbl.textContent = `last ${hh}:${mm}:${ss}${delta !== 0 ? ` (${delta >= 0 ? '+' : ''}${delta})` : ''}`;
     } catch (err) {
+        if (err?.status === 0 && String(err?.message).includes('cancelled')) return;
         console.warn('auto-refresh failed:', err);
-        setStatusBadge('refresh error');
+        setStatusBadge('refresh error: ' + (err?.message || err));
+    } finally {
+        refreshInFlight = false;
     }
 }
 
@@ -107,11 +214,42 @@ function setAutoRefresh(on) {
 async function boot() {
     try {
         setStatusBadge('fetching tasks…');
-        const raw = await fetchAllTasks();
+        _allTasksCtrl = _replaceCtrl(_allTasksCtrl);
+        const raw = await fetchAllTasks({ signal: _allTasksCtrl.signal });
         state.tasks = enrichTasks(raw);
         setStatusBadge(`${Object.keys(state.tasks).length} tasks`);
 
+        const url = readUrlParams();
+
         buildFilterOptions();
+
+        // Hydrate filter state + controls from the URL before any render so
+        // the first filter pass already reflects the saved selection.
+        state.filters.type      = url.type;
+        state.filters.status    = url.status;
+        state.filters.room      = url.room;
+        state.filters.cluster   = url.cluster;
+        state.filters.mvpOnly   = url.mvp;
+        state.filters.readyOnly = url.ready;
+        state.filters.walkOnly  = url.walk;
+        state.filters.hideDone  = url.hideDone;
+        state.filters.search    = url.search;
+        state.viewMode          = url.view;
+
+        $('#f-type').value        = url.type;
+        $('#f-status').value      = url.status;
+        $('#f-room').value        = url.room;
+        $('#f-cluster').value     = url.cluster;
+        $('#f-mvp').checked       = url.mvp;
+        $('#f-ready').checked     = url.ready;
+        $('#f-walk').checked      = url.walk;
+        $('#f-hide-done').checked = url.hideDone;
+        $('#f-ghosts').checked    = url.ghosts;
+        $('#f-autorefresh').checked = url.autoRefresh;
+        $('#f-search').value      = url.search;
+        $('#f-tile-w').value      = url.tileW;
+        $('#f-tile-h').value      = url.tileH;
+
         state.panel = new TaskPanel($('#details'), {
             onStatusChange:     handleStatusChange,
             onPriorityChange:   handlePriorityChange,
@@ -121,35 +259,39 @@ async function boot() {
         });
         state.panel.showEmpty();
 
-        state.graph = createTaskGraph($('#graph-host'), {
-            onNodeTap:        handleNodeTap,
-            onEdgeTap:        handleEdgeTap,
-            onBackgroundTap:  handleBackgroundTap,
-        });
-        state.graph.setData(state.tasks);
-
         state.lanes = new TaskLanes($('#lanes'), {
             onPillTap:        handleNodeTap,
             onBackgroundTap:  handleBackgroundTap,
         });
         state.lanes.setData(state.tasks);
+        state.lanes.setShowGhosts(url.ghosts);
+        state.lanes.setTileSize(url.tileW, url.tileH);
 
         state.clusters = new TaskClusters($('#clusters'), {
             onTaskTap:        handleNodeTap,
             onBackgroundTap:  handleBackgroundTap,
         });
         state.clusters.setData(state.tasks);
+        state.clusters.setTileSize(url.tileW, url.tileH);
 
         applyCurrentFilter();
         wireFilters();
         wireViewToggle();
-        // Apply initial view mode so CSS classes on #graph / #lanes sync with
-        // state.viewMode (avoids a first-paint flash of the wrong pane).
         setViewMode(state.viewMode);
+
+        if (url.autoRefresh) setAutoRefresh(true);
+        if (url.sel && state.tasks[url.sel]) {
+            // Don't await — let the detail fetch run in the background so
+            // a slow /api/tasks/<id> doesn't block the initial render.
+            selectTask(url.sel);
+        }
+
+        // Normalize the URL after hydration (drops unknown / default params).
+        writeUrlParams();
     } catch (err) {
         console.error(err);
-        toast('failed to load tasks: ' + err.message, true);
-        setStatusBadge('error');
+        toast('failed to load tasks: ' + (err?.message || err), true);
+        setStatusBadge('error: ' + (err?.message || err));
     }
 }
 
@@ -190,20 +332,22 @@ function wireFilters() {
         state.filters.hideDone  = $('#f-hide-done').checked;
         state.filters.search    = $('#f-search').value.trim().toLowerCase();
         applyCurrentFilter();
+        writeUrlParams();
     };
 
     ['#f-type','#f-status','#f-room','#f-cluster','#f-mvp','#f-ready','#f-walk','#f-hide-done']
         .forEach(s => $(s).addEventListener('change', onChange));
 
-    // Ghost toggle is a pure lanes-view switch — no filter predicate change,
-    // just tell the lanes controller to re-render with ghosts on/off.
     $('#f-ghosts').addEventListener('change', (ev) => {
         if (state.lanes) state.lanes.setShowGhosts(ev.target.checked);
+        writeUrlParams();
     });
     $('#f-search').addEventListener('input', onChange);
     $('#btn-refresh').addEventListener('click', () => boot());
-    $('#f-autorefresh').addEventListener('change', (ev) => setAutoRefresh(ev.target.checked));
-    $('#btn-fit').addEventListener('click', () => state.graph && state.graph.fit());
+    $('#f-autorefresh').addEventListener('change', (ev) => {
+        setAutoRefresh(ev.target.checked);
+        writeUrlParams();
+    });
 
     $('#mode-cancel').addEventListener('click', exitAddDepMode);
 
@@ -214,13 +358,13 @@ function wireFilters() {
         const h = parseInt($('#f-tile-h').value, 10) || 74;
         if (state.lanes) state.lanes.setTileSize(w, h);
         if (state.clusters) state.clusters.setTileSize(w, h);
+        writeUrlParams();
     };
     $('#f-tile-w').addEventListener('input', applyTileSize);
     $('#f-tile-h').addEventListener('input', applyTileSize);
 }
 
 function applyCurrentFilter() {
-    if (!state.graph) return;
     const f = state.filters;
     // Two-tier filter:
     //   hidePred → completely remove from the DOM (display:none). Used by
@@ -248,7 +392,6 @@ function applyCurrentFilter() {
         }
         return true;
     };
-    state.graph.applyFilter(matchPred, hidePred);
     if (state.lanes) state.lanes.applyFilter(matchPred, hidePred);
     if (state.clusters) state.clusters.applyFilter(matchPred, hidePred);
 
@@ -258,29 +401,22 @@ function applyCurrentFilter() {
 }
 
 function setViewMode(mode) {
+    if (mode !== 'lanes' && mode !== 'clusters') mode = 'lanes';
     state.viewMode = mode;
-    $('#graph').classList.toggle('hidden', mode !== 'graph');
     $('#lanes').classList.toggle('active',  mode === 'lanes');
     $('#clusters').classList.toggle('active', mode === 'clusters');
-    const btnGraph = $('#btn-view-graph');
-    const btnLanes = $('#btn-view-lanes');
+    const btnLanes    = $('#btn-view-lanes');
     const btnClusters = $('#btn-view-clusters');
-    if (btnGraph) btnGraph.classList.toggle('active', mode === 'graph');
-    if (btnLanes) btnLanes.classList.toggle('active', mode === 'lanes');
+    if (btnLanes)    btnLanes.classList.toggle('active',    mode === 'lanes');
     if (btnClusters) btnClusters.classList.toggle('active', mode === 'clusters');
     if (state.selectedId) {
-        if (mode === 'graph') state.graph && state.graph.select(state.selectedId);
-        else if (mode === 'lanes') state.lanes && state.lanes.select(state.selectedId);
+        if (mode === 'lanes') state.lanes && state.lanes.select(state.selectedId);
         else state.clusters && state.clusters.select(state.selectedId);
     }
-    if (mode === 'graph' && state.graph) {
-        // Cytoscape needs a resize kick when its container un-hides.
-        setTimeout(() => state.graph.cy.resize(), 0);
-    }
+    writeUrlParams();
 }
 
 function wireViewToggle() {
-    $('#btn-view-graph').addEventListener('click', () => setViewMode('graph'));
     $('#btn-view-lanes').addEventListener('click', () => setViewMode('lanes'));
     $('#btn-view-clusters').addEventListener('click', () => setViewMode('clusters'));
 }
@@ -290,35 +426,36 @@ async function handleNodeTap(tid) {
     if (state.addDepSource) {
         return attemptAddDep(state.addDepSource, tid);
     }
-    await selectTask(tid);
+    selectTask(tid);
 }
 
 async function selectTask(tid) {
     state.selectedId = tid;
-    state.graph.select(tid);
     if (state.lanes) state.lanes.select(tid);
     if (state.clusters) state.clusters.select(tid);
+    writeUrlParams();
     state.panel.showLoading(tid);
+    _detailCtrl = _replaceCtrl(_detailCtrl);
+    const myCtrl = _detailCtrl;
     try {
-        const detail = await fetchTaskDetail(tid);
+        const detail = await fetchTaskDetail(tid, { signal: myCtrl.signal });
+        // If a newer selectTask already fired, drop this result on the floor.
+        if (myCtrl !== _detailCtrl) return;
         state.panel.render(detail, state.tasks);
     } catch (err) {
-        state.panel.showEmpty(`error: ${err.message}`);
-        toast('failed to load task: ' + err.message, true);
+        if (myCtrl !== _detailCtrl) return; // superseded; newer call owns the panel
+        if (err?.status === 0 && String(err?.message).includes('cancelled')) return;
+        state.panel.showEmpty(`error: ${err?.message || err}`);
+        toast('failed to load task: ' + (err?.message || err), true);
     }
 }
 
 function navigateTo(tid) {
     selectTask(tid);
-    state.graph.cy.animate({
-        center: { eles: state.graph.cy.getElementById(tid) },
-        zoom:   Math.max(state.graph.cy.zoom(), 0.7),
-    }, { duration: 300 });
-}
-
-function handleEdgeTap(source, target) {
-    // Edge click → show the source task's detail (target lives in its depends).
-    selectTask(source);
+    // Scroll the active tile into view in whichever list view is showing.
+    const el = document.querySelector(`.task-pill[data-tid="${CSS.escape(tid)}"],
+                                        .cluster-task-row[data-tid="${CSS.escape(tid)}"]`);
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 function handleBackgroundTap() {
@@ -342,14 +479,13 @@ async function handleStatusChange(tid, to, reason) {
             t.status = to;
             state.tasks = enrichTasks(state.tasks); // re-derive readiness / fan-in
         }
-        state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
         if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
-        await selectTask(tid);
+        selectTask(tid);
         toast(`${tid}: ${result.old || '?'} → ${result.new || to}`);
     } catch (err) {
-        toast('mutation failed: ' + err.message, true);
+        toast('mutation failed: ' + (err?.message || err), true);
     }
 }
 
@@ -363,46 +499,30 @@ async function handlePriorityChange(tid, level) {
             t.priority_boost = result.cleared ? 0 : result.value;
             state.tasks = enrichTasks(state.tasks);
         }
-        if (state.graph) state.graph.setData(state.tasks);
         if (state.lanes) state.lanes.setData(state.tasks);
         if (state.clusters) state.clusters.setData(state.tasks);
         applyCurrentFilter();
-        await selectTask(tid);
+        selectTask(tid);
         toast(`${tid}: priority → ${level}${result.cleared ? ' (cleared)' : ` (${result.value})`}`);
     } catch (err) {
-        toast('priority change failed: ' + err.message, true);
+        toast('priority change failed: ' + (err?.message || err), true);
     }
 }
 
 // ── Dep add / remove ───────────────────────────────────────────────
+// With the graph view gone, add-dep mode is a simple modal state: user
+// clicks "+ add dep" in the detail panel, banner appears, next tile click
+// in the lanes/clusters view is treated as the target. Cycle / self-dep
+// checks run server-side.
 function enterAddDepMode(sourceId) {
     state.addDepSource = sourceId;
-    state.graph.setAddDepSource(sourceId);
-
-    // Pre-compute: candidates that would create a cycle if added.
-    // Heuristic: any task upstream of sourceId via depends_on is a cycle.
-    const wouldCycle = new Set();
-    const stack = [sourceId];
-    wouldCycle.add(sourceId);
-    while (stack.length) {
-        const n = stack.pop();
-        for (const [tid, t] of Object.entries(state.tasks)) {
-            if ((t.depends || []).includes(n) && !wouldCycle.has(tid)) {
-                wouldCycle.add(tid); stack.push(tid);
-            }
-        }
-    }
-    state.graph.markTargetCandidates(sourceId, wouldCycle);
-
     $('#mode-text').textContent = `+ add dep: click the task that ${sourceId} should depend on`;
     $('#mode-banner').classList.add('active');
 }
 
 function exitAddDepMode() {
     state.addDepSource = null;
-    state.graph.clearSelection();
     $('#mode-banner').classList.remove('active');
-    if (state.selectedId) state.graph.select(state.selectedId);
 }
 
 async function attemptAddDep(source, target) {
@@ -420,24 +540,22 @@ async function attemptAddDep(source, target) {
         }
         const result = await addDep(source, target);
         if (result.added) {
-            // Update local state + graph.
             const t = state.tasks[source];
             if (t) {
                 t.depends = t.depends || [];
                 if (!t.depends.includes(target)) t.depends.push(target);
                 state.tasks = enrichTasks(state.tasks);
             }
-            state.graph.addEdge(source, target);
             if (state.lanes) state.lanes.setData(state.tasks);
             if (state.clusters) state.clusters.setData(state.tasks);
             applyCurrentFilter();
-            await selectTask(source);
+            selectTask(source);
             toast(`${source} → ${target} added`);
         } else if (result.already) {
             toast('already exists');
         }
     } catch (err) {
-        toast('add-dep failed: ' + err.message, true);
+        toast('add-dep failed: ' + (err?.message || err), true);
     }
 }
 
@@ -448,17 +566,16 @@ async function handleRemoveDep(source, target) {
             const t = state.tasks[source];
             if (t && t.depends) t.depends = t.depends.filter(d => d !== target);
             state.tasks = enrichTasks(state.tasks);
-            state.graph.removeEdge(source, target);
             if (state.lanes) state.lanes.setData(state.tasks);
             if (state.clusters) state.clusters.setData(state.tasks);
             applyCurrentFilter();
-            await selectTask(source);
+            selectTask(source);
             toast(`${source} → ${target} removed`);
         } else {
             toast('already absent');
         }
     } catch (err) {
-        toast('remove-dep failed: ' + err.message, true);
+        toast('remove-dep failed: ' + (err?.message || err), true);
     }
 }
 

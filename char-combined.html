@@ -167,7 +167,32 @@ const UAL_PATHS = [
     'assets/characters/animations/UAL2_Source.glb',
 ];
 
-let currentOutfitSrc = document.querySelector('#outfit-btns .sel-btn').dataset.src;
+// ── URL state (bounded) ─────────────────────────────────────────
+// Outfit src + clip search term + currently-playing clip name.
+const _urlInit = (() => {
+    const p = new URLSearchParams(location.search);
+    return { outfit: p.get('outfit') || '', q: p.get('q') || '', clip: p.get('clip') || '' };
+})();
+let _currentClipName = '';
+function writeUrl() {
+    const p = new URLSearchParams();
+    if (currentOutfitSrc) p.set('outfit', currentOutfitSrc);
+    if (filterTerm)       p.set('q', filterTerm);
+    if (_currentClipName) p.set('clip', _currentClipName);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+
+// Pre-select the outfit button matching the URL, if any.
+const _initBtns = [...document.querySelectorAll('#outfit-btns .sel-btn')];
+const _wantBtn  = _urlInit.outfit ? _initBtns.find(b => b.dataset.src === _urlInit.outfit) : null;
+if (_wantBtn) {
+    _initBtns.forEach(b => b.classList.toggle('active', b === _wantBtn));
+}
+let currentOutfitSrc = (_wantBtn || document.querySelector('#outfit-btns .sel-btn')).dataset.src;
+filterTerm = _urlInit.q;
+const _searchEl = document.getElementById('clip-search');
+if (_searchEl && filterTerm) _searchEl.value = filterTerm;
 
 // ── Combinaison outfit + animations ──────────────────────────────
 function rebuildScene() {
@@ -200,8 +225,11 @@ function rebuildScene() {
     setStatus('Prêt — ' + allClips.length + ' clips');
     renderClipList();
 
-    // Jouer idle en premier
-    const idleClip = allClips.find(c => c.name.toLowerCase().includes('idle')) || allClips[0];
+    // Restore the persisted clip if it's loaded, else default to idle.
+    const wantClip = _urlInit.clip ? allClips.find(c => c.name === _urlInit.clip) : null;
+    const idleClip = wantClip
+        || allClips.find(c => c.name.toLowerCase().includes('idle'))
+        || allClips[0];
     if (idleClip) playClip(idleClip);
 }
 
@@ -211,8 +239,10 @@ function playClip(clip) {
     const action = mixer.clipAction(clip);
     action.reset().fadeIn(0.2).play();
     activeAction = action;
+    _currentClipName = clip.name;
     document.getElementById('label').textContent =
         (currentOutfitSrc.split('/').pop().replace('.gltf','')) + '\n' + clip.name;
+    writeUrl();
 }
 
 // ── Liste clips ───────────────────────────────────────────────────
@@ -238,6 +268,7 @@ function renderClipList() {
 document.getElementById('clip-search').addEventListener('input', e => {
     filterTerm = e.target.value;
     renderClipList();
+    writeUrl();
 });
 
 // ── Chargement outfit ─────────────────────────────────────────────
@@ -277,6 +308,7 @@ document.querySelectorAll('#outfit-btns .sel-btn').forEach(btn => {
         currentOutfitSrc = btn.dataset.src;
         outfitGltf = null;
         loadOutfit(currentOutfitSrc);
+        writeUrl();
     });
 });
 

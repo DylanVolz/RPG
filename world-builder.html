@@ -163,6 +163,35 @@ const camCtrl = {
 // ── BuildMode ────────────────────────────────────────────────────
 const buildMode = new BuildMode(scene, camera, renderer.domElement, camCtrl);
 
+// ── URL persistence (bounded BuildMode view state) ──────────────
+// Persists which asset palette page (catIdx + itemIdx) and snap size the
+// user was on, so a refresh lands them in the same spot. Placed objects
+// stay in BuildMode's own undo/history stack — that's unbounded state and
+// out of scope for query params.
+function _writeBuildUrl() {
+    const s = buildMode.getViewState();
+    const p = new URLSearchParams();
+    if (s.catIdx)  p.set('cat',  String(s.catIdx));
+    if (s.itemIdx) p.set('item', String(s.itemIdx));
+    if (s.snapIdx !== 1) p.set('snap', String(s.snapIdx)); // 1 = 0.5m default
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+buildMode.setOnViewChange(_writeBuildUrl);
+// Hydrate from URL — must run after BuildMode is constructed but before
+// the first render so the HUD reflects the restored selection.
+(function hydrateBuildModeFromUrl() {
+    const p = new URLSearchParams(location.search);
+    const catIdx  = parseInt(p.get('cat'), 10);
+    const itemIdx = parseInt(p.get('item'), 10);
+    const snapIdx = parseInt(p.get('snap'), 10);
+    buildMode.setViewState({
+        catIdx:  Number.isFinite(catIdx)  ? catIdx  : undefined,
+        itemIdx: Number.isFinite(itemIdx) ? itemIdx : undefined,
+        snapIdx: Number.isFinite(snapIdx) ? snapIdx : undefined,
+    });
+})();
+
 // ── Clavier (WASD FreeCam) ───────────────────────────────────────
 const keys = new Set();
 window.addEventListener('keydown', e => keys.add(e.code));

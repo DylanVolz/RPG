@@ -203,6 +203,22 @@ async function loadAnimations() {
 // ── État ─────────────────────────────────────────────────────────
 let charRenderer = null; // CharacterRenderer — dual-skeleton + shader zones
 let currentAnim  = 'idle';
+let currentCharKey = '';   // for URL persistence
+
+// ── URL state (bounded) ──────────────────────────────────────────
+// Selected character (by saved name, '__player__' for the live player
+// config) and active animation key.
+function readUrlChar() {
+    const p = new URLSearchParams(location.search);
+    return { char: p.get('char') || '', anim: p.get('anim') || 'idle' };
+}
+function writeUrl() {
+    const p = new URLSearchParams();
+    if (currentCharKey) p.set('char', currentCharKey);
+    if (currentAnim && currentAnim !== 'idle') p.set('anim', currentAnim);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
 
 function playAnimKey(key) {
     if (!charRenderer || !allClips.length) return;
@@ -214,6 +230,7 @@ function playAnimKey(key) {
     charRenderer.play(clip);
     document.querySelectorAll('.anim-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.anim === key));
+    writeUrl();
 }
 
 // ── Chargement personnage ─────────────────────────────────────────
@@ -244,20 +261,28 @@ function buildList() {
 
     console.log('[CharPreview] buildList() lancé');
 
+    const url = readUrlChar();
+    if (url.anim) currentAnim = url.anim;
+    let restored = null; // element to auto-select after build
+
     // 1. Personnage joueur sauvegardé
     const playerCfg = resolveCharConfig();
     console.log('[CharPreview] playerCfg:', playerCfg?.name, playerCfg?.meshUrl);
     if (playerCfg) {
         const el = document.createElement('div');
         el.className = 'char-item player';
+        el.dataset.charKey = '__player__';
         el.innerHTML = `<div>&#9733; Perso sauvegarde</div>
             <div class="char-badge">${playerCfg.name || playerCfg.meshUrl?.split('/').pop() || ''}</div>`;
         el.addEventListener('click', () => {
             document.querySelectorAll('.char-item').forEach(i => i.classList.remove('active'));
             el.classList.add('active');
+            currentCharKey = '__player__';
             loadChar(playerCfg);
+            writeUrl();
         });
         list.appendChild(el);
+        if (url.char === '__player__') restored = el;
     }
 
     // 2. Configs nommées
@@ -268,14 +293,18 @@ function buildList() {
             if (!cfg) continue;
             const el = document.createElement('div');
             el.className = 'char-item';
+            el.dataset.charKey = c.name;
             el.innerHTML = `<div>${c.name}</div>
                 <div class="char-badge">${cfg.meshUrl?.split('/').pop() || ''}</div>`;
             el.addEventListener('click', () => {
                 document.querySelectorAll('.char-item').forEach(i => i.classList.remove('active'));
                 el.classList.add('active');
+                currentCharKey = c.name;
                 loadChar(cfg);
+                writeUrl();
             });
             list.appendChild(el);
+            if (url.char === c.name) restored = el;
         }
     }
 
@@ -284,8 +313,8 @@ function buildList() {
         return;
     }
 
-    // Charger le premier automatiquement
-    list.querySelector('.char-item')?.click();
+    // Restore from URL if possible, else first item
+    (restored || list.querySelector('.char-item'))?.click();
 }
 
 // ── Boutons animation ─────────────────────────────────────────────

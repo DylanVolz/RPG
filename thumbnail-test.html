@@ -104,25 +104,12 @@ body {
 <script type="module">
 import { loadManifest, assetUrl } from './src/manifest-loader.js';
 import { getThumbnail, hasCached, clearCache, cacheStats } from './src/thumbnail-cache.js';
+import { PACKS as PACK_REGISTRY } from './src/pack-config.js';
 
-// AnimPicStudio packs — same vendor all the way down (matches the kit browsers).
+// Pack list comes from the shared registry — adding a new AnimPicStudio
+// pack in src/pack-config.js automatically shows it here too.
 const VENDOR = 'animpicstudio';
-const PACKS = [
-    'poly-farm',
-    'poly-forest-village',
-    'poly-mega-survival-construction-kit',
-    'poly-mega-survival-food',
-    'poly-mega-survival-kit',
-    'poly-mega-survival-medical-kit',
-    'poly-mega-survival-tools',
-    'poly-mega-vehicle-kit',
-    'poly-mega-weapons-kit',
-    'poly-military-shooting-range',
-    'poly-nature-pack',
-    'poly-survival-melee-weapons',
-    'poly-survival-subway',
-    'poly-survival-workshop',
-];
+const PACKS = PACK_REGISTRY.map(p => p.slug);
 
 // TODO(T-0200): expose as tunable (cap rows to keep first-render manageable on
 // 400+ item packs — humans browsing the grid never need all at once).
@@ -220,7 +207,13 @@ async function loadThumbsWithLimit(urls, limit) {
     await Promise.all(workers);
 }
 
-packSel.addEventListener('change', () => loadPack(packSel.value));
+function _writeUrl() {
+    const p = new URLSearchParams();
+    if (packSel.value && packSel.value !== PACKS[0]) p.set('pack', packSel.value);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+packSel.addEventListener('change', () => { loadPack(packSel.value); _writeUrl(); });
 renderAllBtn.addEventListener('click', () => loadPack(packSel.value));
 clearBtn.addEventListener('click', async () => {
     await clearCache();
@@ -278,8 +271,10 @@ smokeBtn.addEventListener('click', runSmoke);
 // ── Boot ─────────────────────────────────────────────────────────────────────
 (async () => {
     await refreshStats();
-    packSel.value = PACKS[0];
-    await loadPack(PACKS[0]);
+    const wantPack = new URLSearchParams(location.search).get('pack');
+    const initial = (wantPack && PACKS.includes(wantPack)) ? wantPack : PACKS[0];
+    packSel.value = initial;
+    await loadPack(initial);
 })();
 </script>
 

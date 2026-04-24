@@ -392,6 +392,40 @@ function loadCached(url) {
 
 // ── État ──────────────────────────────────────────────────────
 const state = { body:'M', outfit:'Male_Ranger', hair:'', beard:'', texVariant:1 };
+
+// ── URL state (bounded selections only) ──────────────────────
+// Body / outfit / texVariant / hair / beard / clip search round-trip via
+// query params so a refresh restores the same look. Bone scales + custom
+// colors stay in localStorage configs — too noisy and unbounded for URLs.
+const URL_DEFAULTS = { body:'M', outfit:'Male_Ranger', tex:1, hair:'', beard:'', anim:'' };
+function readUrlState() {
+    const p = new URLSearchParams(location.search);
+    const tex = parseInt(p.get('tex'), 10);
+    return {
+        body:   p.get('body')   ?? URL_DEFAULTS.body,
+        outfit: p.get('outfit') ?? URL_DEFAULTS.outfit,
+        tex:    Number.isFinite(tex) ? tex : URL_DEFAULTS.tex,
+        hair:   p.get('hair')   ?? URL_DEFAULTS.hair,
+        beard:  p.get('beard')  ?? URL_DEFAULTS.beard,
+        anim:   p.get('anim')   ?? URL_DEFAULTS.anim,
+    };
+}
+function writeUrlState() {
+    const cur = {
+        body:   state.body,
+        outfit: state.outfit,
+        tex:    state.texVariant,
+        hair:   state.hair,
+        beard:  state.beard,
+        anim:   typeof clipFilter === 'string' ? clipFilter : '',
+    };
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(cur)) {
+        if (v !== URL_DEFAULTS[k] && v !== '') p.set(k, String(v));
+    }
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
 let outfitRoot = null, bodyRoot = null;
 let mixerOutfit = null, mixerBody = null;
 let activeActionOutfit = null, activeActionBody = null;
@@ -961,35 +995,41 @@ document.querySelectorAll('#body-btns .opt-btn').forEach(btn => btn.addEventList
     state.body = btn.dataset.body;
     setActive('#body-btns .opt-btn', 'body', state.body);
     rebuild();
+    writeUrlState();
 }));
 
 document.querySelectorAll('#outfit-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
     state.outfit = btn.dataset.outfit;
     setActive('#outfit-btns .opt-btn', 'outfit', state.outfit);
     rebuild();
+    writeUrlState();
 }));
 
 document.querySelectorAll('#tex-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
     state.texVariant = parseInt(btn.dataset.tex);
     document.querySelectorAll('#tex-btns .opt-btn').forEach(b => b.classList.toggle('active', b === btn));
     applyTexVariant();
+    writeUrlState();
 }));
 
 document.querySelectorAll('#hair-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
     state.hair = btn.dataset.hair;
     setActive('#hair-btns .opt-btn', 'hair', state.hair);
     swapSlot('hair', state.hair);
+    writeUrlState();
 }));
 
 document.querySelectorAll('#beard-btns .opt-btn').forEach(btn => btn.addEventListener('click', () => {
     state.beard = btn.dataset.beard;
     setActive('#beard-btns .opt-btn', 'beard', state.beard);
     swapSlot('beard', state.beard);
+    writeUrlState();
 }));
 
 
 document.getElementById('clip-search').addEventListener('input', e => {
     clipFilter = e.target.value; renderClips();
+    writeUrlState();
 });
 
 // ── Registry UI cross-panel (outfit ↔ corps eye-btn sync) ────
@@ -1479,6 +1519,7 @@ function loadConfig(cfg) {
     // Pré-remplir le champ nom → le bouton "Sauvegarder" écrasera automatiquement
     document.getElementById('config-name-input').value = cfg.name;
     rebuild();
+    writeUrlState();
 }
 
 function exportConfigToGame(cfg) {
@@ -1563,6 +1604,25 @@ document.getElementById('config-save-btn').addEventListener('click', () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────
+(function hydrateFromUrl() {
+    const url = readUrlState();
+    state.body       = url.body;
+    state.outfit     = url.outfit;
+    state.texVariant = url.tex;
+    state.hair       = url.hair;
+    state.beard      = url.beard;
+    setActive('#body-btns .opt-btn',   'body',   state.body);
+    setActive('#outfit-btns .opt-btn', 'outfit', state.outfit);
+    setActive('#hair-btns .opt-btn',   'hair',   state.hair);
+    setActive('#beard-btns .opt-btn',  'beard',  state.beard);
+    document.querySelectorAll('#tex-btns .opt-btn').forEach(b =>
+        b.classList.toggle('active', parseInt(b.dataset.tex) === state.texVariant));
+    if (url.anim) {
+        clipFilter = url.anim;
+        const cs = document.getElementById('clip-search');
+        if (cs) cs.value = url.anim;
+    }
+})();
 rebuild();
 loadUAL();
 renderConfigList();

@@ -24,7 +24,27 @@
     }
 
     // ── En iframe : le shell gère la navigation, on ne s'injecte pas ─────────
-    if (IN_FRAME) return;
+    //
+    // But before returning, hook history.{push,replace}State so that any
+    // URL change inside the iframe is broadcast up to the shell. The shell
+    // mirrors it into its own hash (#toolid?query) so a full-page refresh
+    // can re-seed the iframe's src with the saved query. Without this, per-
+    // page writeUrlParams() only updates the iframe's own URL, which the
+    // address bar doesn't show and which dies on reload.
+    if (IN_FRAME) {
+        const postSync = () => {
+            try { window.top.postMessage({ type: 'tge-url', query: location.search || '' }, '*'); } catch {}
+        };
+        for (const fn of ['replaceState', 'pushState']) {
+            const orig = history[fn].bind(history);
+            history[fn] = function(...args) { orig(...args); postSync(); };
+        }
+        // Post once on load so the initial iframe query is visible to the
+        // shell even if writeUrlParams hasn't fired yet.
+        if (document.readyState === 'complete') postSync();
+        else window.addEventListener('load', postSync, { once: true });
+        return;
+    }
 
     // ── Accès direct : bouton ≡ flottant ─────────────────────────────────────
     const TOOLS = [
@@ -36,20 +56,7 @@
 { label: 'Char Preview',    id: 'character-preview', icon: '◎',  cat: null },
         { label: 'Anim Inspector',  id: 'anim-inspect',      icon: '▶',  cat: null },
         { label: 'Asset Browser',   id: 'asset-browser',     icon: '❖',  cat: 'Environnement' },
-        { label: 'Survival Tools',  id: 'survival-tools-browser', icon: '⚒', cat: 'Environnement' },
-        { label: 'Vehicle Kit',     id: 'vehicle-kit-browser', icon: '🚚', cat: 'Environnement' },
-        { label: 'Survival Kit',    id: 'survival-kit-browser', icon: '🧰', cat: 'Environnement' },
-        { label: 'Construction Kit',id: 'construction-kit-browser', icon: '🏗', cat: 'Environnement' },
-        { label: 'Nature Pack',     id: 'nature-pack-browser', icon: '🌳', cat: 'Environnement' },
-        { label: 'Farm',            id: 'farm-browser',      icon: '🌾', cat: 'Environnement' },
-        { label: 'Forest Village',  id: 'forest-village-browser', icon: '🏘', cat: 'Environnement' },
-        { label: 'Food',            id: 'survival-food-browser', icon: '🥫', cat: 'Environnement' },
-        { label: 'Medical',         id: 'medical-kit-browser', icon: '💊', cat: 'Environnement' },
-        { label: 'Weapons',         id: 'weapons-kit-browser', icon: '🔫', cat: 'Environnement' },
-        { label: 'Shooting Range',  id: 'shooting-range-browser', icon: '🎯', cat: 'Environnement' },
-        { label: 'Melee Weapons',   id: 'melee-weapons-browser', icon: '🗡', cat: 'Environnement' },
-        { label: 'Subway',          id: 'subway-browser',    icon: '🚇', cat: 'Environnement' },
-        { label: 'Workshop',        id: 'workshop-browser',  icon: '🔧', cat: 'Environnement' },
+        { label: 'Asset Packs',     id: 'pack-browser',      icon: '📦', cat: 'Environnement' },
         { label: 'Thumbnail Cache', id: 'thumbnail-test',    icon: '🖼', cat: 'Éditeur' },
         { label: 'World Builder',   id: 'world-builder',     icon: '⬡',  cat: 'Éditeur' },
         { label: 'Grip Editor',     id: 'grip-editor',       icon: '✦',  cat: null },

@@ -5,11 +5,6 @@
 <title>Task Viewer — KG</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-<!-- Cytoscape + dagre layout via CDN (pattern matches survival-tools-browser.html's three.js import). -->
-<script src="https://unpkg.com/cytoscape@3.29.0/dist/cytoscape.min.js"></script>
-<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-
 <style>
   :root {
     --bg:        #0a0c0e;
@@ -44,7 +39,7 @@
     grid-template-columns: 1fr 360px;
     grid-template-areas:
       "filters filters"
-      "graph   details";
+      "view    details";
     height: 100vh;
     gap: 0;
   }
@@ -75,13 +70,11 @@
     letter-spacing: 1px; text-transform: uppercase;
   }
 
-  #graph, #lanes, #clusters {
-    grid-area: graph;
+  #lanes, #clusters {
+    grid-area: view;
     background: var(--bg);
     position: relative;
   }
-  #graph { overflow: hidden; }
-  #graph-host { position: absolute; inset: 0; }
   /* Lanes: one grid for the whole view — columns = global dep-rank, so a
      dependent task in room B always sits to the right of the task it depends
      on in room A. Overflow scrolls both axes. */
@@ -103,7 +96,6 @@
     --cluster-col-gap: 22px;
   }
   #clusters.active { display: block; }
-  #graph.hidden { display: none; }
 
   #clusters-grid {
     display: grid;
@@ -420,9 +412,11 @@
   }
   .task-pill.walk-type .wv-badge { display: none; }
 
-  /* Mode banner (top of graph) when user is in "add dep" or "remove dep" mode. */
+  /* Add-dep mode banner — fixed at the top of the view area. Clicking
+     any tile in lanes/clusters while this is active treats that tile as
+     the dep target. */
   #mode-banner {
-    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
     background: rgba(212, 168, 75, 0.18); border: 1px solid var(--accent);
     color: var(--accent); padding: 4px 10px; font-size: 11px; letter-spacing: 1px;
     pointer-events: auto; display: none; z-index: 10;
@@ -486,11 +480,12 @@
   }
   #toast.error { border-color: var(--status-blocked); color: var(--status-blocked); }
 
-  /* Empty state */
+  /* Empty state — overlay on the active view area. */
   #empty {
-    position: absolute; inset: 0; display: none;
+    grid-area: view; display: none;
     align-items: center; justify-content: center; color: var(--fg-dim);
     text-align: center; font-size: 13px; padding: 40px;
+    pointer-events: none;
   }
   #empty.active { display: flex; }
 </style>
@@ -524,10 +519,8 @@
         <input type="checkbox" id="f-autorefresh"/> auto-refresh
     </label>
     <span id="autorefresh-indicator" style="color:var(--fg-dim); font-size:10px; display:none;">· <span id="autorefresh-last">—</span></span>
-    <button id="btn-fit" title="fit graph to viewport">fit</button>
 
     <span style="margin-left:8px; color:var(--fg-dim);">view</span>
-    <button id="btn-view-graph" title="swimlane DAG">graph</button>
     <button id="btn-view-lanes" class="active" title="horizontal lanes table">lanes</button>
     <button id="btn-view-clusters" title="cluster summary cards">clusters</button>
 
@@ -540,21 +533,18 @@
     <span id="status-badge">loading…</span>
   </div>
 
-  <div id="graph">
-    <div id="graph-host"></div>
-    <div id="mode-banner">
-      <span id="mode-text"></span>
-      <button id="mode-cancel">cancel</button>
-    </div>
-    <div id="empty">No tasks match the current filters.</div>
-  </div>
-
   <div id="lanes"><div id="lanes-grid"></div></div>
   <div id="clusters"><div id="clusters-grid"></div></div>
+  <div id="empty">No tasks match the current filters.</div>
+
+  <div id="mode-banner">
+    <span id="mode-text"></span>
+    <button id="mode-cancel">cancel</button>
+  </div>
 
   <div id="details">
     <p style="color: var(--fg-dim); font-style: italic;">
-      Click a task node to see its details. Click an edge to inspect / remove a dependency.
+      Click a task to see its details. Use "+ add dep" in the detail panel then click another tile to link them.
     </p>
   </div>
 </div>
@@ -562,5 +552,6 @@
 <div id="toast"></div>
 
 <script type="module" src="./src/task-viewer-main.js"></script>
+<script src="src/nav.js"></script>
 </body>
 </html>

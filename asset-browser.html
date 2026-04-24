@@ -683,6 +683,10 @@ function loadModel(item, catName) {
 // ── Clips animations ───────────────────────────────────────────
 function rebuildClips() {
     if (!ualLoaded || !mixer) return;
+    if (animFilterPending && !animFilter) {
+        animFilter = animFilterPending;
+        animFilterPending = '';
+    }
     renderClipList();
     const idle = allClips.find(c => c.name.toLowerCase().includes('idle_loop'))
               || allClips.find(c => c.name.toLowerCase().includes('idle'))
@@ -722,6 +726,38 @@ function playClip(clip) {
 let currentCat  = 'Personnages';
 let searchTerm  = '';
 let selectedCard = null;  // élément DOM actif
+let selectedName = '';    // persisted via URL — restored after renderGrid()
+let animFilterPending = ''; // applied once UAL animations finish loading
+
+// ── URL state ──────────────────────────────────────────────────
+// Tab + search + animation filter + selection round-trip via the URL so
+// reload restores the same view. Only non-default values are written.
+const URL_DEFAULTS = { cat: 'Personnages', q: '', anim: '', sel: '' };
+
+function readUrlState() {
+    const p = new URLSearchParams(location.search);
+    return {
+        cat:  p.get('cat')  ?? URL_DEFAULTS.cat,
+        q:    p.get('q')    ?? URL_DEFAULTS.q,
+        anim: p.get('anim') ?? URL_DEFAULTS.anim,
+        sel:  p.get('sel')  ?? URL_DEFAULTS.sel,
+    };
+}
+
+function writeUrlState() {
+    const cur = {
+        cat:  currentCat,
+        q:    searchTerm,
+        anim: typeof animFilter === 'string' ? animFilter : '',
+        sel:  selectedName,
+    };
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(cur)) {
+        if (v !== URL_DEFAULTS[k] && v !== '') p.set(k, v);
+    }
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
 
 function renderGrid() {
     const subs     = CATALOG[currentCat] || {};
@@ -749,9 +785,12 @@ function renderGrid() {
             if (selectedCard) selectedCard.classList.remove('active');
             card.classList.add('active');
             selectedCard = card;
+            selectedName = item.name;
             loadModel(item, subLabel || currentCat);
+            writeUrlState();
         });
 
+        card.dataset.assetName = item.name;
         grid.appendChild(card);
         return card;
     };
@@ -773,9 +812,11 @@ function renderGrid() {
         document.getElementById('item-count').textContent = allItems.length + ' assets';
     }
 
-    // Auto-sélectionner le premier item
-    const firstCard = grid.querySelector('.asset-card');
-    if (firstCard) firstCard.click();
+    // Restore the persisted selection if it's still in the visible grid;
+    // otherwise fall back to auto-selecting the first card.
+    let target = null;
+    if (selectedName) target = grid.querySelector(`.asset-card[data-asset-name="${CSS.escape(selectedName)}"]`);
+    (target || grid.querySelector('.asset-card'))?.click();
 }
 
 // ── Onglets ────────────────────────────────────────────────────
@@ -788,9 +829,11 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.getElementById('search-clear').classList.remove('visible');
         searchTerm = '';
         selectedCard = null;
+        selectedName = '';
         if (currentCat !== 'Personnages')
             document.getElementById('anim-panel').style.display = 'none';
         renderGrid();
+        writeUrlState();
     });
 });
 
@@ -800,6 +843,7 @@ document.getElementById('search').addEventListener('input', e => {
     document.getElementById('search-clear').classList.toggle('visible', searchTerm.length > 0);
     selectedCard = null;
     renderGrid();
+    writeUrlState();
 });
 document.getElementById('search-clear').addEventListener('click', () => {
     document.getElementById('search').value = '';
@@ -808,15 +852,41 @@ document.getElementById('search-clear').addEventListener('click', () => {
     selectedCard = null;
     renderGrid();
     document.getElementById('search').focus();
+    writeUrlState();
 });
 
 // ── Animations ─────────────────────────────────────────────────
 document.getElementById('anim-search').addEventListener('input', e => {
     animFilter = e.target.value;
     renderClipList();
+    writeUrlState();
 });
 
 // ── Init ──────────────────────────────────────────────────────
+(function hydrateFromUrl() {
+    const url = readUrlState();
+    // Tab — only honour if the category exists.
+    const tab = document.querySelector(`.tab[data-cat="${CSS.escape(url.cat)}"]`);
+    if (tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentCat = url.cat;
+        if (currentCat !== 'Personnages')
+            document.getElementById('anim-panel').style.display = 'none';
+    }
+    if (url.q) {
+        searchTerm = url.q;
+        const sb = document.getElementById('search');
+        sb.value = url.q;
+        document.getElementById('search-clear').classList.toggle('visible', true);
+    }
+    selectedName = url.sel;
+    if (url.anim) {
+        animFilterPending = url.anim;
+        const ab = document.getElementById('anim-search');
+        if (ab) ab.value = url.anim;
+    }
+})();
 renderGrid();
 
 // ═══════════════════════════════════════════════════════════════

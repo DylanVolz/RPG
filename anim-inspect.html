@@ -126,6 +126,8 @@ async function loadAllAnims() {
     document.getElementById('count').textContent  = '';
 
     const listEl = document.getElementById('list');
+    const wantClip = new URLSearchParams(location.search).get('clip') || '';
+    let wantBtn = null;
     for (const clip of clips) {
         const action = mixer.clipAction(clip);
         const btn = document.createElement('div');
@@ -137,10 +139,15 @@ async function loadAllAnims() {
             active = action;
             document.querySelectorAll('#list .clip').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            const p = new URLSearchParams();
+            p.set('clip', clip.name);
+            history.replaceState(null, '', location.pathname + '?' + p.toString());
         });
+        if (clip.name === wantClip) wantBtn = btn;
         listEl.appendChild(btn);
     }
-    if (clips.length > 0) listEl.children[0].click();
+    if (clips.length > 0) (wantBtn || listEl.children[0]).click();
+    if (wantBtn) wantBtn.scrollIntoView({ block: 'center' });
 }
 
 loadAllAnims();

@@ -145,6 +145,12 @@ function playAnim(name, crossfade = 0.2) {
         b.classList.toggle('active', b.dataset.anim === name);
     });
     document.getElementById('status').textContent = '▶  ' + name;
+
+    // URL persistence — only Idle is the default, omit it from the URL.
+    const p = new URLSearchParams();
+    if (name && name !== 'Idle') p.set('anim', name);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
 }
 
 // ── Chargement Soldier.glb ───────────────────────────────────────
@@ -176,8 +182,11 @@ loader.load(
         listEl.innerHTML = '<span style="color:rgba(200,184,154,0.25);margin-bottom:4px">CLIPS DÉTECTÉS</span>'
             + clipNames.map(n => `<span>${n}</span>`).join('');
 
-        // Jouer Idle par défaut
-        playAnim('Idle', 0);
+        // Restore URL-saved animation if it's a clip we just loaded;
+        // otherwise default to Idle.
+        const wantAnim = new URLSearchParams(location.search).get('anim');
+        const initial = (wantAnim && actions[wantAnim]) ? wantAnim : 'Idle';
+        playAnim(initial, 0);
     },
     (xhr) => {
         const pct = Math.round(xhr.loaded / xhr.total * 100);

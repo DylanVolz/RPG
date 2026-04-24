@@ -820,6 +820,37 @@ export class BuildMode {
     // ── Public ─────────────────────────────────────────────────
     get active() { return this._active; }
 
+    // Bounded view state — used by callers (e.g. world-builder URL params)
+    // that want to restore the user's last palette + snap selection on
+    // refresh. Placed objects are NOT exposed here; that's unbounded state
+    // owned by the editor's history stack, not a query-param concern.
+    getViewState() {
+        return { catIdx: this._catIdx, itemIdx: this._itemIdx, snapIdx: this._snapIdx };
+    }
+    setViewState(s) {
+        if (!s) return;
+        if (Number.isFinite(s.catIdx) && CATALOG[s.catIdx]) {
+            this._catIdx = s.catIdx;
+            this._itemIdx = 0;
+        }
+        if (Number.isFinite(s.itemIdx) && CATALOG[this._catIdx]?.items[s.itemIdx]) {
+            this._itemIdx = s.itemIdx;
+        }
+        if (Number.isFinite(s.snapIdx) && SNAP_SIZES[s.snapIdx] !== undefined) {
+            this._snapIdx = s.snapIdx;
+        }
+        this._refreshHotbar?.();
+        this._refreshHUD?.();
+    }
+    setOnViewChange(cb) {
+        this._onViewChange = typeof cb === 'function' ? cb : null;
+    }
+    _emitViewChange() {
+        if (this._onViewChange) {
+            try { this._onViewChange(this.getViewState()); } catch(e) { console.warn(e); }
+        }
+    }
+
     toggle() {
         this._active = !this._active;
 
@@ -2066,6 +2097,7 @@ export class BuildMode {
         this._itemIdx = 0;
         this._loadGhostCurrent();
         this._refreshHUD();
+        this._emitViewChange();
     }
 
     _goItem(dir) {
@@ -2073,6 +2105,7 @@ export class BuildMode {
         this._itemIdx = (this._itemIdx + dir + n) % n;
         this._loadGhostCurrent();
         this._refreshHUD();
+        this._emitViewChange();
     }
 
     // ── Rotation ───────────────────────────────────────────────
@@ -2097,6 +2130,7 @@ export class BuildMode {
     _cycleSnap() {
         this._snapIdx = (this._snapIdx + 1) % SNAP_SIZES.length;
         this._refreshHUD();
+        this._emitViewChange();
     }
 
     _toggleAxisLock(axis) {
@@ -2913,6 +2947,7 @@ export class BuildMode {
             this._itemIdx = entry.itemIdx;
             this._loadGhostCurrent();
             this._refreshHUD();
+            this._emitViewChange();
         }
         this._refreshHotbar();
     }

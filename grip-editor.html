@@ -369,6 +369,40 @@ const ANIM_GROUPS = [
 // ═══════════════════════════════════════════════════════════════
 let currentCharKey = '__global__'; // mis à jour quand on change de perso
 
+// ── URL state (bounded selections only) ──────────────────────
+// Active char / editor mode / weapon being edited / camera view / anim
+// search round-trip via the URL. Per-weapon grip transforms stay in their
+// existing localStorage so the URL doesn't bloat.
+const URL_DEFAULTS = { char:'__saved__', mode:'grip', weapon:'', view:'hand', anim:'', clip:'' };
+function readUrlState() {
+    const p = new URLSearchParams(location.search);
+    return {
+        char:   p.get('char')   ?? URL_DEFAULTS.char,
+        mode:   p.get('mode')   ?? URL_DEFAULTS.mode,
+        weapon: p.get('weapon') ?? URL_DEFAULTS.weapon,
+        view:   p.get('view')   ?? URL_DEFAULTS.view,
+        anim:   p.get('anim')   ?? URL_DEFAULTS.anim,
+        clip:   p.get('clip')   ?? URL_DEFAULTS.clip,
+    };
+}
+function writeUrlState() {
+    const sel = document.getElementById('char-select');
+    const cur = {
+        char:   sel ? sel.value : URL_DEFAULTS.char,
+        mode:   typeof editorMode === 'string' ? editorMode : URL_DEFAULTS.mode,
+        weapon: editingKey || '',
+        view:   typeof currentView === 'string' ? currentView : URL_DEFAULTS.view,
+        anim:   typeof animFilter === 'string' ? animFilter : '',
+        clip:   _currentClipName || '',
+    };
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(cur)) {
+        if (v !== URL_DEFAULTS[k] && v !== '') p.set(k, v);
+    }
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+
 function _charKeyFromVal(val) {
     if (val === '__saved__') return 'player';
     if (val.startsWith('__named__:')) return val.slice(10);
@@ -574,7 +608,10 @@ function buildCharSelector() {
     }
     sel.appendChild(grp2);
 
-    sel.addEventListener('change', () => loadCharacterFromVal(sel.value));
+    sel.addEventListener('change', () => {
+        loadCharacterFromVal(sel.value);
+        writeUrlState();
+    });
 }
 
 function cfgFromVal(val) {
@@ -715,6 +752,7 @@ function playClip(clip) {
     if (!charRenderer) return;
     charRenderer.play(clip);
     _currentClipName = clip.name;
+    writeUrlState();
     document.querySelectorAll('.clip-row').forEach(r => {
         const span = r.querySelector('span');
         r.classList.toggle('active', !!span && span.textContent === clip.name);
@@ -724,6 +762,7 @@ function playClip(clip) {
 document.getElementById('anim-search').addEventListener('input', e => {
     animFilter = e.target.value;
     renderClipList();
+    writeUrlState();
 });
 
 // Onglets de mode Grip / Holster
@@ -735,6 +774,7 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
         const sectionHdr = document.getElementById('wl-section-hdr');
         sectionHdr.textContent = editorMode === 'grip' ? 'Armes & Outils' : 'Placement Corps';
         buildWeaponList();
+        writeUrlState();
     });
 });
 
@@ -1119,6 +1159,7 @@ async function selectWeapon(key) {
         await attachWeapon(key);
         setCameraView(currentView);
     }
+    writeUrlState();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1167,6 +1208,7 @@ function setCameraView(view) {
         b.classList.toggle('active', b.dataset.view === view);
     });
     CAM_VIEWS[view]?.();
+    writeUrlState();
 }
 document.querySelectorAll('.cam-btn').forEach(btn => {
     btn.addEventListener('click', () => setCameraView(btn.dataset.view));
@@ -1300,8 +1342,47 @@ try { buildCharSelector(); } catch(e) {
 
 setStatus('Prêt');
 
-// Charger le personnage sauvegardé par défaut
-loadCharacterFromVal('__saved__');
+// ── Hydrate UI state from URL, defer per-clip / per-weapon resolution ──
+const _urlInit = readUrlState();
+// Editor mode tab
+if (_urlInit.mode && _urlInit.mode !== 'grip') {
+    const t = document.querySelector(`.mode-tab[data-mode="${_urlInit.mode}"]`);
+    if (t) t.click();
+}
+// Camera view button (CSS state only — actual camera reframe runs later
+// when the character/bone is available).
+if (_urlInit.view && _urlInit.view !== 'hand') {
+    currentView = _urlInit.view;
+    document.querySelectorAll('.cam-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.view === _urlInit.view));
+}
+// Anim search filter
+if (_urlInit.anim) {
+    animFilter = _urlInit.anim;
+    const ab = document.getElementById('anim-search');
+    if (ab) ab.value = _urlInit.anim;
+}
+// Char selector — pick the URL value if it's still in the dropdown options.
+const _charSel = document.getElementById('char-select');
+const _wantChar = _urlInit.char || '__saved__';
+if (_charSel && [..._charSel.options].some(o => o.value === _wantChar)) {
+    _charSel.value = _wantChar;
+}
+
+(async () => {
+    await loadCharacterFromVal(_charSel ? _charSel.value : '__saved__');
+    // Now that the character is attached + clips are loaded, restore the
+    // saved weapon + clip selection if they exist.
+    if (_urlInit.weapon) {
+        try { await selectWeapon(_urlInit.weapon); } catch(e) { console.warn(e); }
+    }
+    if (_urlInit.clip) {
+        const clip = allClips.find(c => c.name === _urlInit.clip);
+        if (clip) playClip(clip);
+    }
+    // Re-frame camera now that the bone is known.
+    setCameraView(currentView);
+})();
 </script>
 
 <script src="src/asset-check.js"></script>
